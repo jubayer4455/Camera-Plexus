@@ -208,10 +208,13 @@
         </div>
 
         <div class="plexus-hud-row">
-          <button class="plexus-hud-btn" id="plexus-btn-audio" title="Audio Reactive Glow">
-            <span>🔊 Audio Pulse</span>
+          <button class="plexus-hud-btn" id="plexus-btn-game" title="Interactive Finger Gun & Target Shooting Game">
+            <span>🎯 Game</span>
           </button>
-          <button class="plexus-hud-btn" id="plexus-btn-eco" title="Eco Mode for Low-End PCs">
+          <button class="plexus-hud-btn" id="plexus-btn-audio" title="Audio Reactive Glow">
+            <span>🔊 Audio</span>
+          </button>
+          <button class="plexus-hud-btn" id="plexus-btn-eco" title="Eco Mode for Mobile & Low-End PCs">
             <span>🌱 Eco</span>
           </button>
         </div>
@@ -330,6 +333,17 @@
       });
     }
 
+    const gameBtn = container.querySelector('#plexus-btn-game');
+    if (gameBtn) {
+      gameBtn.addEventListener('click', () => {
+        pressEffect(gameBtn);
+        const cur = !!FX.settings?.targetGame?.on;
+        saveSettings({ targetGame: { on: !cur } });
+        FX.showStatus?.(cur ? 'target game OFF' : '🎯 Target Game ON: use finger gun 👉 to pop balloons!', 'ok');
+        updateHUD();
+      });
+    }
+
     const audioBtn = container.querySelector('#plexus-btn-audio');
     if (audioBtn) {
       audioBtn.addEventListener('click', () => {
@@ -362,6 +376,17 @@
     const powerBtn = container.querySelector('#plexus-btn-power');
     const gesturesBtn = container.querySelector('#plexus-btn-gestures');
     const drawBtn = container.querySelector('#plexus-btn-draw');
+    const gameBtn = container.querySelector('#plexus-btn-game');
+    if (gameBtn) {
+      gameBtn.addEventListener('click', () => {
+        pressEffect(gameBtn);
+        const cur = !!FX.settings?.targetGame?.on;
+        saveSettings({ targetGame: { on: !cur } });
+        FX.showStatus?.(cur ? 'target game OFF' : '🎯 Target Game ON: use finger gun 👉 to pop balloons!', 'ok');
+        updateHUD();
+      });
+    }
+
     const audioBtn = container.querySelector('#plexus-btn-audio');
     const ecoBtn = container.querySelector('#plexus-btn-eco');
     const statusBadge = container.querySelector('#plexus-hud-status');
@@ -381,6 +406,7 @@
 
     if (gesturesBtn) gesturesBtn.classList.toggle('active', !!cfg.gestures?.on);
     if (drawBtn) drawBtn.classList.toggle('active', !!cfg.airDraw?.on);
+    if (gameBtn) gameBtn.classList.toggle('active', !!cfg.targetGame?.on);
     if (audioBtn) audioBtn.classList.toggle('active', !!cfg.audioPulse?.on);
     if (ecoBtn) ecoBtn.classList.toggle('active', !!cfg.ecoMode);
 

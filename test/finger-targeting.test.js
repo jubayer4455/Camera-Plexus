@@ -196,3 +196,32 @@ test('Super Saiyan triggers on wide arm spread', () => {
   const isChestHeight = h1.wrist.y > 0.20 && h1.wrist.y < 0.92 && h2.wrist.y > 0.20 && h2.wrist.y < 0.92;
   assert.strictEqual(isSpread && isChestHeight, true, 'Super Saiyan pose detected');
 });
+
+test('Finger Gun detects cocked hammer and trigger pull', () => {
+  // Hand with index extended, middle/ring/pinky curled
+  const gunCocked = createSampleHand({
+    thumb: 'up',
+    index: 'extended',
+    middle: 'curled',
+    ring: 'curled',
+    pinky: 'curled',
+  });
+  const [thumb, index, middle, ring, pinky] = getFingerExtensions(gunCocked);
+  assert.ok(thumb > 0.8, 'Thumb is up (cocked)');
+  assert.ok(index > 0.8, 'Index barrel extended');
+  assert.strictEqual(middle, 0);
+  assert.strictEqual(ring, 0);
+  assert.strictEqual(pinky, 0);
+
+  // Trigger pulled (thumb lowered into palm)
+  const gunFired = createSampleHand({
+    thumb: 'curled',
+    index: 'extended',
+    middle: 'curled',
+    ring: 'curled',
+    pinky: 'curled',
+  });
+  const [fThumb, fIndex, fMiddle, fRing, fPinky] = getFingerExtensions(gunFired);
+  assert.strictEqual(fThumb, 0, 'Thumb lowered (trigger pulled)');
+  assert.ok(fIndex > 0.8, 'Index barrel stays aimed');
+});

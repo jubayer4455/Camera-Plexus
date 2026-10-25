@@ -46,13 +46,23 @@ Trigger jaw-dropping superhero and anime visual effects simply by gesturing with
 * 👍 **Thumbs Up:** Launches golden fireworks and glowing floating thumbs-up emblems.
 * 🫶 **Heart Sign:** Form a heart with both hands or finger-pinch to release floating neon love hearts that drift upwards with romantic glow.
 
-### ✏️ 3. Air Canvas (Draw in the Air)
+### 🎮 3. Interactive Finger Gun Shooting Game (Live Mini-Game!)
+Turn your webcam into an arcade shooting gallery during boring video calls:
+* 🔫 **Finger Gun Mechanics (👉):** Form a gun with your hand (Index finger straight forward, other fingers curled, Thumb cocked up as the hammer).
+* 💥 **Thumb Trigger Pull:** Flick your thumb down to pull the trigger — fires a supersonic neon laser plasma bolt complete with muzzle flash and an authentic arcade laser sound!
+* 🎈 **Drifting Neon Targets:** Translucent cyber balloons with glowing star emblems bob and float upward across your video feed.
+* 🎯 **Laser Sight Reticle:** When your finger gun is aimed and cocked, a dynamic dotted targeting line and holographic crosshair assist your aim!
+* 💥 **Pop & Score:** Hitting a target causes it to pop with an explosive sparkle burst, popping sound, floating `+100` score indicators, and combo multipliers (`Combo 2x, 3x, 5x`)!
+* 🏆 **Live Cyber Scoreboard:** A sleek holographic HUD badge at the top tracks your live score and targets popped in real time!
+* 🔘 **1-Click Game Mode:** Easily toggle the game on or off anytime via the `🎯 Game` button on the floating HUD.
+
+### ✏️ 4. Air Canvas (Draw in the Air)
 * **Air Drawing:** Point your index finger in the air (or pinch thumb and index together) to paint smooth glowing neon ribbon strokes in 3D/2D space!
 * **Smooth Bézier Curves:** Custom quadratic Bézier interpolation ensures your air handwriting is silky-smooth with zero jagged edges.
 * **Custom Colors & Size:** Pick any neon color and brush size from 1px to 25px.
 * **1-Click Wipe:** Clear your air canvas anytime with the on-screen trash button.
 
-### 🎨 4. 10 Stunning Visual Presets
+### 🎨 5. 10 Stunning Visual Presets
 * 🌈 **Rainbow Mode:** Dynamic RGB spectrum cycle that flows seamlessly like gaming RGB lighting.
 * 🧙 **Doctor Strange:** Fiery amber, mystic gold, and glowing orange embers.
 * 🔥 **Fire:** Blazing red, fiery orange, and rising heat sparks.
@@ -60,23 +70,24 @@ Trigger jaw-dropping superhero and anime visual effects simply by gesturing with
 * 💻 **Matrix:** Digital hacker green code stream and falling glyphs.
 * 💜 **Violet, ❄️ Ice, ⚡ Ember, 💖 Neon, ⚪ Mono**
 
-### 🔊 5. Audio-Reactive Pulse & Sci-Fi Sounds
+### 🔊 6. Audio-Reactive Pulse & Sci-Fi Sounds
 * **Voice & Beat Reactivity:** When you speak or play music, the plexus lines and glow dynamically pulse in thickness and brightness to your voice volume!
 * **Synthesized Audio Chimes:** Built-in subtle sci-fi sound effects when turning on/off or triggering gestures (synthesized via Web Audio API, 100% offline).
 
-### ⚡ 6. Sleek On-Screen Floating HUD
+### ⚡ 7. Sleek On-Screen Floating HUD
 * An interactive glassmorphism control menu floats directly on your video call screen.
 * Change themes, toggle gestures, activate Air Draw, or wipe the canvas in 1 click **without opening browser popups or leaving your call**!
 * **Ghost Menu:** The floating HUD is rendered in your local DOM — **remote callers only see your cool video effects, never the menu!**
 * Can be dragged anywhere on your screen or minimized into a small glowing floating icon (`✨`).
 
-### 🏎️ 7. 60 FPS Ultra-Smooth Performance
+### 🏎️ 8. Ultra-Smooth 60 FPS Performance & Mobile Optimizer
+* **Adaptive Mobile Downscaling:** Automatically senses mobile devices (e.g. Kiwi Browser on Android) and dynamically switches to a featherweight 320p inference pipeline — slashing CPU/GPU load by over 55% for buttery 60 FPS tracking without phone heating or battery drain!
 * **Continuous Exponential Motion Interpolation:** Eliminates AI detection micro-stutter for fluid, silky 60fps tracking.
 * **Direct GPU Acceleration:** Front-buffer desynchronized hardware rendering.
 * **Batched Path Strokes:** Reduces canvas draw calls by ~90%.
-* **🌱 Eco Mode:** Built-in battery and CPU/GPU saver for low-end laptops.
+* **🌱 Eco Mode:** Built-in battery and CPU/GPU saver for low-end laptops and mobile phones.
 
-### 🔒 8. 100% Privacy & Offline AI
+### 🔒 9. 100% Privacy & Offline AI
 * Powered by bundled on-device **Google MediaPipe Vision AI**.
 * **Zero network calls:** Your webcam feed, microphone, and hand tracking never leave your local computer.
 

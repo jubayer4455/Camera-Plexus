@@ -5,13 +5,23 @@
 (() => {
   const FX = (globalThis.__plexusFx = globalThis.__plexusFx || {});
 
-  const DETECT_WIDTH = 480; // Optimized from 640 for faster GPU/CPU inference & low latency
+  const isMobileDevice = typeof navigator !== 'undefined' && (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    (typeof window !== 'undefined' && window.innerWidth <= 800 && 'ontouchstart' in window)
+  );
+
+  // Dynamic mobile resolution: 320px on mobile devices for ultra-fast inference & zero lag!
+  const DETECT_WIDTH = isMobileDevice ? 320 : 440;
+  const MIN_SUBMIT_INTERVAL_MS = isMobileDevice ? 40 : 25;
   const REPLY_TIMEOUT_MS = 1000;
   const LOAD_TIMEOUT_MS = 20000;
+
+  FX.isMobile = isMobileDevice;
 
   // onStatus(kind, detail): kind is 'ready' or 'error'.
   function createTracker(baseUrl, onHands, onStatus = () => {}) {
     const origin = new URL(baseUrl).origin;
+    let lastSubmitTime = 0;
     const iframe = document.createElement('iframe');
     iframe.src = new URL('detector/detector.html', baseUrl).href;
     iframe.setAttribute('aria-hidden', 'true');
@@ -52,9 +62,11 @@
     // segment: also ask for a person mask (only needed for person lighting).
     async function submit(frame, segment = false) {
       const now = performance.now();
+      if (now - lastSubmitTime < MIN_SUBMIT_INTERVAL_MS) return;
       const busy = state.inflightSince !== null && now - state.inflightSince < REPLY_TIMEOUT_MS;
       if (!state.ready || busy || !iframe.contentWindow) return;
       state.inflightSince = now;
+      lastSubmitTime = now;
       try {
         const w = frame.displayWidth;
         const h = frame.displayHeight;

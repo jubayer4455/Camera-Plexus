@@ -40,6 +40,18 @@
     let screenWebs = [];
     let webProjectiles = [];
 
+    // Finger Gun Shooting Game State
+    let gameScore = 0;
+    let gameCombo = 1;
+    let lastHitTime = 0;
+    let targetsPopped = 0;
+    let balloons = []; // { id, x, y, vx, vy, radius, color, seed, wobble }
+    let bullets = []; // { x, y, vx, vy, angle, life, length }
+    let scorePopups = []; // { x, y, text, alpha, life, vy, color }
+    let muzzleFlashes = []; // { x, y, radius, alpha, color }
+    let gunStates = { left: 'idle', right: 'idle' };
+    let lastBalloonSpawnAt = 0;
+
     // Trigger cooldowns to prevent spamming single-shot bursts
     let lastPeaceAt = 0;
     let lastThumbAt = 0;
@@ -57,6 +69,13 @@
       currentStroke = null;
       screenWebs = [];
       webProjectiles = [];
+      balloons = [];
+      bullets = [];
+      scorePopups = [];
+      muzzleFlashes = [];
+      gameScore = 0;
+      gameCombo = 1;
+      targetsPopped = 0;
     }
 
     // Single hand gesture detection
@@ -128,6 +147,13 @@
       // Pointing (Air draw trigger): Index extended, Middle/Ring/Pinky curled
       const isPoint = indexExt && middleCurled && ringCurled && pinkyCurled;
 
+      // 🔫 Finger Gun (Index extended, Middle/Ring/Pinky curled)
+      const isGunShape = indexExt && middleCurled && ringCurled && pinkyCurled;
+      // Thumb UP (cocked hammer) vs Thumb DOWN (trigger pull)
+      const thumbCocked = isGunShape && ((wrist.y - thumbTip.y > 0.30 * hSize) || (dist(thumbTip, indexMcp) > 0.40 * hSize));
+      const thumbPulled = isGunShape && (dist(thumbTip, indexMcp) < 0.32 * hSize || thumbTip.y >= indexMcp.y - 0.08 * hSize);
+      const barrelAngle = Math.atan2(indexTip.y - indexMcp.y, indexTip.x - indexMcp.x);
+
       // Direction vector for laser sword blade
       const swordMidTip = { x: (indexTip.x + middleTip.x) / 2, y: (indexTip.y + middleTip.y) / 2 };
       const swordMidPip = { x: (indexPip.x + middlePip.x) / 2, y: (indexPip.y + middlePip.y) / 2 };
@@ -148,6 +174,10 @@
         isSword,
         isFist,
         isSpiderMan,
+        isGunShape,
+        thumbCocked,
+        thumbPulled,
+        barrelAngle,
         swordAngle,
         swordMidTip,
         hSize,
@@ -357,6 +387,36 @@
           }
         }
 
+        // 🔫 Finger Gun (shooting laser bullets)
+        if (a.isGunShape) {
+          if (a.thumbCocked && gunStates[sideKey] !== 'cocked') {
+            gunStates[sideKey] = 'cocked';
+          } else if (a.thumbPulled && gunStates[sideKey] === 'cocked') {
+            gunStates[sideKey] = 'fired';
+            const ang = a.barrelAngle;
+            const spd = 1650;
+            bullets.push({
+              x: px,
+              y: py,
+              vx: Math.cos(ang) * spd,
+              vy: Math.sin(ang) * spd,
+              angle: ang,
+              life: 1,
+              length: 36,
+            });
+            muzzleFlashes.push({
+              x: px,
+              y: py,
+              radius: 26,
+              alpha: 1,
+              color: '#00ffff',
+            });
+            FX.playSound?.('laserGun');
+          }
+        } else {
+          gunStates[sideKey] = 'idle';
+        }
+
         // Air Drawing
         if (settings.airDraw?.on) {
           const isDrawing = a.isPoint || a.isPinch;
@@ -494,6 +554,117 @@
       webProjectiles = webProjectiles.filter((p) => {
         p.progress += p.speed * dt;
         return p.progress < 1;
+      });
+
+      // --- Finger Gun & Target Game Systems ---
+      const gameOn = Boolean(settings.targetGame?.on);
+
+      // Reset combo if no target hit for > 3.2s
+      if (now - lastHitTime > 3200 && gameCombo > 1) {
+        gameCombo = 1;
+      }
+
+      if (gameOn) {
+        // Spawn floating neon cyber balloons
+        const maxBalloons = FX.isMobile ? 3 : 5;
+        const spawnInterval = FX.isMobile ? 2200 : 1600;
+        if (balloons.length < maxBalloons && now - lastBalloonSpawnAt > spawnInterval) {
+          lastBalloonSpawnAt = now;
+          const colors = ['#00ffff', '#ff007f', '#ffff00', '#00ff66', '#a878ff', '#ff8800'];
+          const col = colors[Math.floor(Math.random() * colors.length)];
+          balloons.push({
+            id: Math.random(),
+            x: w * (0.15 + Math.random() * 0.7),
+            y: h + 30,
+            vx: (Math.random() - 0.5) * 45,
+            vy: -75 - Math.random() * 65,
+            radius: (26 + Math.random() * 10) * (Math.min(w, h) / 720),
+            color: col,
+            seed: Math.random() * 100,
+          });
+        }
+      }
+
+      // Update balloons
+      balloons = balloons.filter((b) => {
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        b.wobble = Math.sin(now * 0.004 + b.seed) * 10;
+        return b.y > -70 && b.x > -70 && b.x < w + 70;
+      });
+
+      // Update bullets and collision with balloons
+      bullets = bullets.filter((bullet) => {
+        bullet.x += bullet.vx * dt;
+        bullet.y += bullet.vy * dt;
+
+        let hit = false;
+        for (let i = 0; i < balloons.length; i += 1) {
+          const b = balloons[i];
+          const bx = b.x + (b.wobble || 0);
+          const by = b.y;
+          const d = dist({ x: bullet.x, y: bullet.y }, { x: bx, y: by });
+          if (d < b.radius + 14) {
+            hit = true;
+            balloons.splice(i, 1);
+            targetsPopped += 1;
+
+            if (now - lastHitTime < 3200) {
+              gameCombo = Math.min(gameCombo + 1, 5);
+            } else {
+              gameCombo = 1;
+            }
+            lastHitTime = now;
+            const pts = 100 * gameCombo;
+            gameScore += pts;
+
+            FX.playSound?.('balloonPop');
+            scorePopups.push({
+              x: bx,
+              y: by,
+              text: gameCombo > 1 ? `+${pts} (${gameCombo}x)` : `+${pts}`,
+              alpha: 1,
+              life: 1,
+              vy: -60,
+              color: b.color,
+            });
+
+            // Burst particle shower
+            const burstCount = FX.isMobile ? 10 : 18;
+            for (let k = 0; k < burstCount; k += 1) {
+              const spdA = Math.random() * Math.PI * 2;
+              const spd = 100 + Math.random() * 240;
+              sparks.push({
+                x: bx,
+                y: by,
+                vx: Math.cos(spdA) * spd,
+                vy: Math.sin(spdA) * spd,
+                size: 2.5 + Math.random() * 3,
+                color: b.color,
+                life: 1,
+                decay: 1.3,
+              });
+            }
+            break;
+          }
+        }
+
+        const inBounds = bullet.x >= -60 && bullet.x <= w + 60 && bullet.y >= -60 && bullet.y <= h + 60;
+        return !hit && inBounds;
+      });
+
+      // Update score popups
+      scorePopups = scorePopups.filter((p) => {
+        p.y += p.vy * dt;
+        p.life -= 1.1 * dt;
+        p.alpha = Math.max(0, p.life);
+        return p.life > 0;
+      });
+
+      // Update muzzle flashes
+      muzzleFlashes = muzzleFlashes.filter((f) => {
+        f.alpha -= 9.0 * dt;
+        return f.alpha > 0;
       });
 
       // Super Saiyan aura sparks (rising up rapidly)
@@ -931,6 +1102,218 @@
       ctx.restore();
     }
 
+    // Drawing helper: 🎈 Cyber Balloons (Target Game)
+    function drawCyberBalloon(ctx, b, now, unit) {
+      ctx.save();
+      const cx = b.x + (b.wobble || 0);
+      const cy = b.y;
+      const r = b.radius;
+
+      ctx.shadowColor = b.color;
+      ctx.shadowBlur = FX.isMobile ? 0 : 16 * unit;
+
+      // Balloon body gradient
+      const grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+      grad.addColorStop(0.35, b.color);
+      grad.addColorStop(0.85, 'rgba(15, 12, 28, 0.7)');
+      grad.addColorStop(1, b.color);
+
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = `rgba(255, 255, 255, 0.85)`;
+      ctx.lineWidth = 2 * unit;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Specular shine
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.beginPath();
+      ctx.ellipse(cx - r * 0.35, cy - r * 0.35, r * 0.28, r * 0.16, -Math.PI / 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Tie knot
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.moveTo(cx - 4 * unit, cy + r);
+      ctx.lineTo(cx + 4 * unit, cy + r);
+      ctx.lineTo(cx, cy + r + 6 * unit);
+      ctx.closePath();
+      ctx.fill();
+
+      // Swaying string
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.lineWidth = 1.2 * unit;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + r + 6 * unit);
+      const stringWave = Math.sin(now * 0.006 + b.seed) * 8 * unit;
+      ctx.quadraticCurveTo(cx + stringWave, cy + r + 24 * unit, cx - stringWave * 0.5, cy + r + 45 * unit);
+      ctx.stroke();
+
+      // Inner glowing target cross
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.lineWidth = 1.8 * unit;
+      ctx.beginPath();
+      ctx.moveTo(cx - r * 0.45, cy);
+      ctx.lineTo(cx + r * 0.45, cy);
+      ctx.moveTo(cx, cy - r * 0.45);
+      ctx.lineTo(cx, cy + r * 0.45);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // Drawing helper: 🔫 Laser Bullets
+    function drawLaserBullet(ctx, b, unit) {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.angle);
+
+      const bLen = b.length * unit;
+      const bW = 6 * unit;
+
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = FX.isMobile ? 0 : 12 * unit;
+
+      // Outer neon trail
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.85)';
+      ctx.lineWidth = bW * 2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-bLen, 0);
+      ctx.lineTo(0, 0);
+      ctx.stroke();
+
+      // Inner white core
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = bW;
+      ctx.beginPath();
+      ctx.moveTo(-bLen * 0.7, 0);
+      ctx.lineTo(0, 0);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // Drawing helper: 🎯 Laser Sight Crosshair
+    function drawAimSight(ctx, tip, angle, w, h, unit) {
+      ctx.save();
+      const crosshairDist = 260 * unit;
+      const tx = tip.x + Math.cos(angle) * crosshairDist;
+      const ty = tip.y + Math.sin(angle) * crosshairDist;
+
+      // Dotted targeting laser line
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
+      ctx.lineWidth = 1.4 * unit;
+      ctx.setLineDash([6 * unit, 6 * unit]);
+      ctx.beginPath();
+      ctx.moveTo(tip.x, tip.y);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Neon reticle crosshair
+      ctx.translate(tx, ty);
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = FX.isMobile ? 0 : 8 * unit;
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.9)';
+      ctx.lineWidth = 2 * unit;
+
+      const r = 16 * unit;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Crosshair pips
+      ctx.beginPath();
+      ctx.moveTo(-r - 6 * unit, 0); ctx.lineTo(-r + 4 * unit, 0);
+      ctx.moveTo(r - 4 * unit, 0); ctx.lineTo(r + 6 * unit, 0);
+      ctx.moveTo(0, -r - 6 * unit); ctx.lineTo(0, -r + 4 * unit);
+      ctx.moveTo(0, -r + 4 * unit); ctx.lineTo(0, r + 6 * unit);
+      ctx.stroke();
+
+      // Center dot
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, 0, 2.5 * unit, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // Drawing helper: Muzzle Flash
+    function drawMuzzleFlash(ctx, f, unit) {
+      if (f.alpha <= 0.01) return;
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      ctx.fillStyle = `rgba(255, 255, 255, ${f.alpha})`;
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = FX.isMobile ? 0 : 18 * unit;
+
+      const r = f.radius * unit * (0.8 + 0.4 * f.alpha);
+      ctx.beginPath();
+      for (let i = 0; i < 8; i += 1) {
+        const a = (i * Math.PI * 2) / 8;
+        const curR = i % 2 === 0 ? r : r * 0.35;
+        const x = Math.cos(a) * curR;
+        const y = Math.sin(a) * curR;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Drawing helper: 🏆 Game Scoreboard
+    function drawScoreboard(ctx, w, h, score, popped, combo, unit) {
+      ctx.save();
+      const badgeW = 340 * unit;
+      const badgeH = 40 * unit;
+      const bx = (w - badgeW) / 2;
+      const by = 20 * unit;
+
+      ctx.fillStyle = 'rgba(12, 10, 22, 0.88)';
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
+      ctx.lineWidth = 1.6 * unit;
+      ctx.shadowColor = 'rgba(0, 240, 255, 0.35)';
+      ctx.shadowBlur = FX.isMobile ? 0 : 12 * unit;
+
+      ctx.beginPath();
+      ctx.roundRect(bx, by, badgeW, badgeH, 12 * unit);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = `bold ${Math.round(13 * unit)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      const textY = by + badgeH / 2;
+      ctx.fillStyle = '#ffffff';
+      const comboText = combo > 1 ? ` 🔥 ${combo}x` : '';
+      ctx.fillText(`🎯 TARGETS: ${popped}   ⭐ SCORE: ${score}${comboText}`, w / 2, textY);
+
+      ctx.restore();
+    }
+
+    // Drawing helper: Floating Score Indicators
+    function drawScorePopups(ctx, unit) {
+      if (!scorePopups.length) return;
+      ctx.save();
+      scorePopups.forEach((p) => {
+        ctx.font = `bold ${Math.round(20 * unit)}px -apple-system, sans-serif`;
+        ctx.fillStyle = p.color || '#ffff00';
+        ctx.shadowColor = p.color || '#ffff00';
+        ctx.shadowBlur = FX.isMobile ? 0 : 10 * unit;
+        ctx.globalAlpha = p.alpha;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.text, p.x, p.y);
+      });
+      ctx.restore();
+    }
+
     function draw(ctx, w, h, now, settings, smoothedHands) {
       ctx.save();
       const unit = Math.min(w, h) / 720;
@@ -1042,7 +1425,42 @@
         screenWebs.forEach((web) => drawSpiderWeb(ctx, web));
       }
 
-      // 8. Confetti Particles
+      // 8. 🎯 Target Game: Cyber Balloons
+      if (balloons.length) {
+        balloons.forEach((b) => drawCyberBalloon(ctx, b, now, unit));
+      }
+
+      // 9. 🔫 Finger Gun: Laser Bullets & Muzzle Flashes
+      if (bullets.length) {
+        bullets.forEach((b) => drawLaserBullet(ctx, b, unit));
+      }
+      if (muzzleFlashes.length) {
+        muzzleFlashes.forEach((f) => drawMuzzleFlash(ctx, f, unit));
+      }
+
+      // 10. 🎯 Finger Gun Aiming Crosshair
+      if (smoothedHands && smoothedHands.length) {
+        smoothedHands.forEach((hd, i) => {
+          const sideKey = i === 0 ? 'left' : 'right';
+          if (gunStates[sideKey] === 'cocked') {
+            const tip = hd.tips && hd.tips[1] ? { x: hd.tips[1].x * w, y: hd.tips[1].y * h } : { x: hd.palm.x * w, y: hd.palm.y * h };
+            const ang = laserSwordAngles[sideKey] || 0;
+            drawAimSight(ctx, tip, ang, w, h, unit);
+          }
+        });
+      }
+
+      // 11. Floating Score Popups
+      if (scorePopups.length) {
+        drawScorePopups(ctx, unit);
+      }
+
+      // 12. 🏆 Live Scoreboard (Top Screen)
+      if (settings.targetGame?.on) {
+        drawScoreboard(ctx, w, h, gameScore, targetsPopped, gameCombo, unit);
+      }
+
+      // 13. Confetti Particles
       if (confetti.length) {
         confetti.forEach((c) => {
           ctx.save();
@@ -1055,7 +1473,7 @@
         });
       }
 
-      // 9. Sparks
+      // 14. Sparks
       if (sparks.length) {
         sparks.forEach((s) => {
           ctx.fillStyle = s.color;
@@ -1066,7 +1484,7 @@
         });
       }
 
-      // 10. Floaters (Heart, Thumb)
+      // 15. Floaters (Heart, Thumb)
       if (floaters.length) {
         floaters.forEach((f) => {
           if (f.type === 'heart') {

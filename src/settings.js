@@ -42,6 +42,9 @@
       on: false,
       speed: 1,
     },
+    targetGame: {
+      on: false,
+    },
     ecoMode: false,
     hudVisible: true,
   });
@@ -130,6 +133,9 @@
       rainbow: {
         on: bool(rb.on, DEFAULTS.rainbow.on),
         speed: clamp(rb.speed, 0.1, 5, DEFAULTS.rainbow.speed),
+      },
+      targetGame: {
+        on: bool(src.targetGame?.on, DEFAULTS.targetGame.on),
       },
       ecoMode: bool(src.ecoMode, DEFAULTS.ecoMode),
       hudVisible: bool(src.hudVisible, DEFAULTS.hudVisible),
