@@ -24,6 +24,10 @@
       heart: true,
       mysticShield: true,
       energyBall: true,
+      chidori: true,
+      spiderWeb: true,
+      superSaiyan: true,
+      laserSword: true,
     },
     airDraw: {
       on: false,
@@ -109,6 +113,10 @@
         heart: bool(g.heart, DEFAULTS.gestures.heart),
         mysticShield: bool(g.mysticShield, DEFAULTS.gestures.mysticShield),
         energyBall: bool(g.energyBall, DEFAULTS.gestures.energyBall),
+        chidori: bool(g.chidori, DEFAULTS.gestures.chidori),
+        spiderWeb: bool(g.spiderWeb, DEFAULTS.gestures.spiderWeb),
+        superSaiyan: bool(g.superSaiyan, DEFAULTS.gestures.superSaiyan),
+        laserSword: bool(g.laserSword, DEFAULTS.gestures.laserSword),
       },
       airDraw: {
         on: bool(ad.on, DEFAULTS.airDraw.on),

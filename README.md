@@ -34,13 +34,17 @@ Everyone on your call — whether on **Google Meet, Facebook Messenger, OmeTV, D
 * **Target Only What You Open:** Whichever fingers you extend — whether it's an **"L" / Gun shape** (thumb + index), **Pointing** (index only), **Peace sign** (index + middle), **Rock horns** (index + pinky), or **Open hand** — ONLY those active extended fingers light up with neon nodes and laser energy rays radiating directly from your palm!
 * **Silky Smooth Dissolve:** Closed fingers fade out smoothly in milliseconds with continuous exponential decay, giving a high-tech Iron Man holographic feel.
 
-### 🖐️ 2. Smart Hand Gestures & Animations
-Trigger jaw-dropping visual effects simply by moving your hands:
+### 🖐️ 2. Anime & Superhero Power FX (Live Gestures)
+Trigger jaw-dropping superhero and anime visual effects simply by gesturing with your hands:
+* ⚡ **Chidori / Lightning Fist (Naruto):** Clench your hand into a closed fist — dynamic branching electric lightning arcs, intense cyan glow, and crackling high-voltage sparks envelop your fist accompanied by an authentic electric crackle sound!
+* 🕸️ **Spider-Man Web Shoot (Marvel):** Flash the iconic Spider-Man sign (🤟) — shoots a high-speed conical web tracer directly toward the camera! Neon webbing splats and sticks right on your screen glass with sagging polygonal rings, dewdrop nodes, and dripping strands with a synthesized "THWIP!" sound.
+* 🔥 **Super Saiyan Aura (Dragon Ball Z):** Strike the DBZ power-up pose by spreading both arms wide — surging golden flame pillars, rising Ki particles, screen-edge golden aura vignette, and crackling Super Saiyan 2 lightning erupt around you with a resonant power hum!
+* ⚔️ **Laser Sword / Lightsaber (Star Wars):** Press your Index and Middle fingers together (sword hand grip) — a brilliant lightsaber blade projects forward from your fingertips with a blinding white-hot laser core, neon energy bloom, hilt emitter ring, humming sound, and flying plasma embers!
+* 🖐️ **Doctor Strange Mystic Shield:** Open your palm facing the camera to generate a rotating ancient mystic mandala shield with concentric fiery circles and rotating geometric runes.
+* 🔮 **Two-Hand Plasma Energy Ball (Rasengan):** Hold your palms facing each other to create a crackling, swirling plasma energy sphere with live electric arcs bridging your hands!
 * ✌️ **Peace / Victory Sign:** Spawns a celebratory burst of fluttering multi-colored confetti and glowing stars.
 * 👍 **Thumbs Up:** Launches golden fireworks and glowing floating thumbs-up emblems.
 * 🫶 **Heart Sign:** Form a heart with both hands or finger-pinch to release floating neon love hearts that drift upwards with romantic glow.
-* 🖐️ **Doctor Strange Mystic Shield:** Open your palm facing the camera to generate a rotating ancient mystic mandala shield with concentric fiery circles and rotating geometric runes.
-* 🔮 **Two-Hand Plasma Energy Ball (Rasengan):** Hold your palms facing each other to create a crackling, swirling plasma energy sphere with live electric arcs bridging your hands!
 
 ### ✏️ 3. Air Canvas (Draw in the Air)
 * **Air Drawing:** Point your index finger in the air (or pinch thumb and index together) to paint smooth glowing neon ribbon strokes in 3D/2D space!

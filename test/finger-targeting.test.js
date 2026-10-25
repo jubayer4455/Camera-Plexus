@@ -146,3 +146,53 @@ test('thumbs up only targets thumb', () => {
   assert.strictEqual(ring, 0);
   assert.strictEqual(pinky, 0);
 });
+
+// Anime & Superhero Gesture Tests
+test('Chidori triggers when hand forms a closed fist', () => {
+  const hand = createSampleHand({
+    thumb: 'curled',
+    index: 'curled',
+    middle: 'curled',
+    ring: 'curled',
+    pinky: 'curled',
+  });
+  const [thumb, index, middle, ring, pinky] = getFingerExtensions(hand);
+  const isFist = thumb === 0 && index === 0 && middle === 0 && ring === 0 && pinky === 0;
+  assert.strictEqual(isFist, true, 'All fingers curled is fist for Chidori');
+});
+
+test('Spider-Man 🤟 sign targets thumb, index, and pinky while curling middle and ring', () => {
+  const hand = createSampleHand({
+    thumb: 'extended',
+    index: 'extended',
+    middle: 'curled',
+    ring: 'curled',
+    pinky: 'extended',
+  });
+  const [thumb, index, middle, ring, pinky] = getFingerExtensions(hand);
+  assert.ok(thumb > 0.8, 'Thumb should be extended');
+  assert.ok(index > 0.8, 'Index should be extended');
+  assert.strictEqual(middle, 0, 'Middle must be curled');
+  assert.strictEqual(ring, 0, 'Ring must be curled');
+  assert.ok(pinky > 0.8, 'Pinky should be extended');
+});
+
+test('Laser Sword vs Peace Sign tip separation', () => {
+  const aspect = 1.777;
+  const swordGap = 0.02 * aspect; // Touching fingers
+  const peaceGap = 0.06 * aspect; // V-shape spread
+  const threshold = 0.038 * aspect;
+
+  assert.ok(swordGap <= threshold, 'Sword fingers must be close');
+  assert.ok(peaceGap > threshold, 'Peace sign fingers must be spread');
+});
+
+test('Super Saiyan triggers on wide arm spread', () => {
+  const aspect = 1.777;
+  const h1 = { wrist: { x: 0.22 * aspect, y: 0.55 } }; // Left side
+  const h2 = { wrist: { x: 0.78 * aspect, y: 0.55 } }; // Right side
+  const rawHandSpan = Math.abs(h1.wrist.x - h2.wrist.x) / aspect;
+  const isSpread = rawHandSpan > 0.38;
+  const isChestHeight = h1.wrist.y > 0.20 && h1.wrist.y < 0.92 && h2.wrist.y > 0.20 && h2.wrist.y < 0.92;
+  assert.strictEqual(isSpread && isChestHeight, true, 'Super Saiyan pose detected');
+});

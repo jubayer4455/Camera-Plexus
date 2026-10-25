@@ -196,8 +196,8 @@
         </div>
 
         <div class="plexus-hud-row">
-          <button class="plexus-hud-btn" id="plexus-btn-gestures" title="Peace, Thumbs Up, Heart, Shield, Energy Ball">
-            <span>🖐️ Gestures</span>
+          <button class="plexus-hud-btn" id="plexus-btn-gestures" title="Anime & Superhero FX: Chidori (Fist), Spider-Web (🤟), Super Saiyan (Spread), Lightsaber (Sword), Peace, Shield, Rasengan">
+            <span>🦸 FX & Gestures</span>
           </button>
           <button class="plexus-hud-btn" id="plexus-btn-draw" title="Air Drawing (Point or Pinch to Draw)">
             <span>✏️ Air Draw</span>
