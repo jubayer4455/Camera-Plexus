@@ -1,0 +1,15 @@
+# OS generated files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs & temp
+*.log
+.npm/
+node_modules/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.bak

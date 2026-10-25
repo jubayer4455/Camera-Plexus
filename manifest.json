@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "Camera Plexus - Glowing Hand Effects & Gestures",
+  "version": "2.0.0",
+  "description": "Glowing plexus lines, gestures (peace, heart, thumbs up, mystic shield, energy ball), and air drawing for Google Meet, Messenger, OmeTV, and all camera video calls.",
+  "icons": { "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "permissions": ["storage"],
+  "action": {
+    "default_title": "Camera Plexus settings",
+    "default_popup": "popup/popup.html",
+    "default_icon": { "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/bridge.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "src/settings.js",
+        "src/status.js",
+        "src/clap.js",
+        "src/gestures.js",
+        "src/particles.js",
+        "src/plexus.js",
+        "src/lighting.js",
+        "src/tracker.js",
+        "src/audio-clap.js",
+        "src/engine.js",
+        "src/pipeline.js",
+        "src/hook.js",
+        "src/hud.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["detector/*", "vendor/*"],
+      "matches": ["*://*/*"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}
