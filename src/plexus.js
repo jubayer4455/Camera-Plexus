@@ -25,6 +25,56 @@
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const toPoint = (lm) => ({ x: lm[0], y: lm[1] });
 
+  // Intelligent finger extension detection (0 = curled in fist, 1 = fully extended)
+  // Ensures only opened fingers are targeted; curled fingers have zero clutter/nodes
+  function getFingerExtensions(landmarks) {
+    if (!landmarks || landmarks.length < 21) return [1, 1, 1, 1, 1];
+    const pt = (i) => ({ x: landmarks[i][0], y: landmarks[i][1] });
+    const wrist = pt(0);
+    const middleMcp = pt(9);
+    const pinkyMcp = pt(17);
+    const indexMcp = pt(5);
+    const handSize = Math.max(0.001, dist(wrist, middleMcp));
+
+    // 4 fingers: Index (8,6,5), Middle (12,10,9), Ring (16,14,13), Pinky (20,18,17)
+    const fingerConfigs = [
+      { tip: 8, pip: 6, mcp: 5 },
+      { tip: 12, pip: 10, mcp: 9 },
+      { tip: 16, pip: 14, mcp: 13 },
+      { tip: 20, pip: 18, mcp: 17 },
+    ];
+
+    const fingerExts = fingerConfigs.map(({ tip, pip, mcp }) => {
+      const pTip = pt(tip);
+      const pPip = pt(pip);
+      const pMcp = pt(mcp);
+
+      const rWrist = dist(pTip, wrist) / Math.max(0.001, dist(pPip, wrist));
+      const rMcp = dist(pTip, pMcp) / Math.max(0.001, dist(pPip, pMcp));
+
+      const scoreWrist = (rWrist - 0.98) / 0.28;
+      const scoreMcp = (rMcp - 1.05) / 0.55;
+      const score = Math.max(scoreWrist, scoreMcp);
+      return Math.max(0, Math.min(1, score));
+    });
+
+    // Thumb (tip 4, mcp 2)
+    const thumbTip = pt(4);
+    const thumbMcp = pt(2);
+
+    const dIndex = dist(thumbTip, indexMcp) / handSize;
+    const dMiddle = dist(thumbTip, middleMcp) / handSize;
+    const dPinky = dist(thumbTip, pinkyMcp) / Math.max(0.001, dist(thumbMcp, pinkyMcp));
+
+    const sIndex = (dIndex - 0.32) / 0.22;
+    const sPinky = (dPinky - 0.98) / 0.25;
+    const sMiddle = (dMiddle - 0.48) / 0.22;
+    const thumbScore = Math.max(sIndex, sPinky, sMiddle);
+    const thumbExt = Math.max(0, Math.min(1, thumbScore));
+
+    return [thumbExt, fingerExts[0], fingerExts[1], fingerExts[2], fingerExts[3]];
+  }
+
   // Cached halo sprite for ultra-fast GPU-accelerated node rendering
   let haloSprite = null;
   function getHaloSprite() {
@@ -47,15 +97,18 @@
     const rawTips = TIP_IDS.map((i) => toPoint(landmarks[i]));
     const palm = avg(PALM_IDS.map((i) => toPoint(landmarks[i])));
     const size = dist(toPoint(landmarks[0]), toPoint(landmarks[9]));
+    const targetExt = getFingerExtensions(landmarks);
 
     if (!prev) {
       return {
         targetTips: rawTips,
-        tips: rawTips.map((p) => ({ ...p })),
+        tips: rawTips.map((p, i) => ({ ...p, ext: targetExt[i] })),
         targetPalm: palm,
         palm: { ...palm },
         targetSize: size,
         size,
+        targetExt,
+        ext: [...targetExt],
         seenAt: now,
         speed: 0,
         vis: 0,
@@ -70,6 +123,8 @@
       palm: prev.palm,
       targetSize: size,
       size: prev.size,
+      targetExt,
+      ext: prev.ext || [...targetExt],
       seenAt: now,
       speed: lerp(prev.speed, moved, 0.4),
       vis: prev.vis,
@@ -87,9 +142,11 @@
     });
   }
 
-  // Fast geometry builder with squared distance filtering
+  // Fast geometry builder with squared distance filtering and selective finger targeting
   function buildGeometry(handList, level, now, w, h) {
-    const tipSets = handList.map((hand) => hand.tips.map((p) => ({ x: p.x * w, y: p.y * h })));
+    const tipSets = handList.map((hand) =>
+      hand.tips.map((p) => ({ x: p.x * w, y: p.y * h, ext: p.ext ?? 1 }))
+    );
     const palms = handList.map((hand) => ({ x: hand.palm.x * w, y: hand.palm.y * h }));
     const sats = handList.flatMap((hand, i) => satellites(hand, i, now, w, h));
     const handAlpha = handList.map((hand) => level * hand.vis);
@@ -97,38 +154,73 @@
     const segments = [];
     const facets = [];
 
+    // Two hands connecting: scale segments and facets by finger extensions
     if (tipSets.length >= 2) {
       const [l, r] = tipSets;
       for (let i = 0; i < TIP_IDS.length - 1; i += 1) {
-        facets.push([l[i], l[i + 1], r[i + 1], 0.2 * webAlpha]);
-        facets.push([l[i], r[i + 1], r[i], 0.13 * webAlpha]);
-        segments.push([l[i], r[i + 1], 0.35 * webAlpha]);
+        const wFac1 = 0.2 * webAlpha * l[i].ext * l[i + 1].ext * r[i + 1].ext;
+        if (wFac1 > 0.01) facets.push([l[i], l[i + 1], r[i + 1], wFac1]);
+
+        const wFac2 = 0.13 * webAlpha * l[i].ext * r[i + 1].ext * r[i].ext;
+        if (wFac2 > 0.01) facets.push([l[i], r[i + 1], r[i], wFac2]);
+
+        const wCross = 0.35 * webAlpha * l[i].ext * r[i + 1].ext;
+        if (wCross > 0.01) segments.push([l[i], r[i + 1], wCross]);
       }
-      l.forEach((p, i) => segments.push([p, r[i], 0.9 * webAlpha]));
+      l.forEach((p, i) => {
+        const wDirect = 0.9 * webAlpha * p.ext * r[i].ext;
+        if (wDirect > 0.01) segments.push([p, r[i], wDirect]);
+      });
     }
+
+    // Intra-hand geometry: selective targeting based on finger open/curled state
     tipSets.forEach((tips, hi) => {
-      for (let i = 0; i < tips.length - 1; i += 1) {
-        facets.push([palms[hi], tips[i], tips[i + 1], (tipSets.length >= 2 ? 0.07 : 0.16) * handAlpha[hi]]);
-        segments.push([tips[i], tips[i + 1], 0.75 * handAlpha[hi]]);
+      const alpha = handAlpha[hi];
+      if (alpha <= 0.001) return;
+      const palm = palms[hi];
+
+      // Filter tips that are open/extended (ext > 0.08)
+      const openTips = tips
+        .map((p, idx) => ({ ...p, fingerIdx: idx }))
+        .filter((p) => p.ext > 0.08);
+
+      // Connect palm to each open fingertip with glowing energy beams
+      openTips.forEach((tip) => {
+        segments.push([palm, tip, 0.75 * alpha * tip.ext]);
+      });
+
+      // Connect consecutive open fingertips to each other and build facets with palm
+      if (openTips.length >= 2) {
+        for (let i = 0; i < openTips.length - 1; i += 1) {
+          const a = openTips[i];
+          const b = openTips[i + 1];
+          const pairExt = a.ext * b.ext;
+          segments.push([a, b, 0.75 * alpha * pairExt]);
+          facets.push([palm, a, b, (tipSets.length >= 2 ? 0.07 : 0.16) * alpha * pairExt]);
+        }
       }
     });
 
-    // Spatial pairing using squared distance to skip Math.sqrt on non-connections
-    const nodes = [...tipSets.flat(), ...sats];
+    // Spatial pairing: only open tips (ext > 0.15) and satellites connect
+    const activeTips = tipSets.flatMap((tips) => tips.filter((p) => p.ext > 0.15));
+    const nodes = [...activeTips, ...sats];
     const maxD = Math.min(w, h) * 0.24;
     const maxDSq = maxD * maxD;
     const nLen = nodes.length;
 
     for (let i = 0; i < nLen; i += 1) {
       const p1 = nodes[i];
+      const e1 = p1.ext !== undefined ? p1.ext : 1;
       for (let j = i + 1; j < nLen; j += 1) {
         const p2 = nodes[j];
+        const e2 = p2.ext !== undefined ? p2.ext : 1;
         const dx = p1.x - p2.x;
         const dy = p1.y - p2.y;
         const dSq = dx * dx + dy * dy;
         if (dSq < maxDSq) {
           const d = Math.sqrt(dSq);
-          segments.push([p1, p2, (1 - d / maxD) * 0.3 * level]);
+          const sAlpha = (1 - d / maxD) * 0.3 * level * e1 * e2;
+          if (sAlpha > 0.01) segments.push([p1, p2, sAlpha]);
         }
       }
     }
@@ -166,7 +258,7 @@
 
     function setActive(on) {
       target = on ? 1 : 0;
-      const origins = geom.tipSets.flat();
+      const origins = geom.tipSets.flat().filter((p) => (p.ext ?? 1) > 0.2);
       const center = [{ x: frame.w / 2, y: frame.h / 2 }];
       if (els().shards?.on) particles.burstShards(origins.length ? origins : center, scale(), on ? 60 : 90);
       if (!on && els().dust?.on) particles.dustAlong(geom.segments, DISSOLVE_DUST, scale(), true);
@@ -180,18 +272,23 @@
       const step = (dt * 1000) / FADE_MS;
       level = target > level ? Math.min(target, level + step) : Math.max(target, level - step);
 
-      // Continuous exponential interpolation towards target positions
+      // Continuous exponential interpolation towards target positions & finger extensions
       // Guarantees 60fps buttery movement even when detection is running at ~30fps
       const smoothFactor = 1 - Math.exp(-dt * 24);
+      const extFactor = 1 - Math.exp(-dt * 20);
 
       hands = new Map(
         [...hands]
           .filter(([, hd]) => now - hd.seenAt < HAND_TIMEOUT_MS)
           .map(([k, hd]) => {
             const visible = now - hd.seenAt < 120 ? 1 : 0;
+            const updatedExt = (hd.ext || [1, 1, 1, 1, 1]).map((val, i) =>
+              lerp(val, hd.targetExt ? hd.targetExt[i] : 1, extFactor)
+            );
             const updatedTips = hd.tips.map((p, i) => ({
               x: lerp(p.x, hd.targetTips[i].x, smoothFactor),
               y: lerp(p.y, hd.targetTips[i].y, smoothFactor),
+              ext: updatedExt[i],
             }));
             const updatedPalm = {
               x: lerp(hd.palm.x, hd.targetPalm.x, smoothFactor),
@@ -202,6 +299,7 @@
               k,
               {
                 ...hd,
+                ext: updatedExt,
                 tips: updatedTips,
                 palm: updatedPalm,
                 size: updatedSize,
@@ -222,9 +320,12 @@
         }
         list.forEach((hand, i) => {
           if (hand.speed > 0.015 && Math.random() < hand.speed * 20) {
-            const tip = geom.tipSets[i][Math.floor(Math.random() * TIP_IDS.length)];
-            if (els().shards?.on) particles.shedShard(tip.x, tip.y, scale());
-            if (els().dust?.on) particles.dustAt([tip], 5, scale());
+            const openTips = geom.tipSets[i].filter((p) => p.ext > 0.25);
+            if (openTips.length > 0) {
+              const tip = openTips[Math.floor(Math.random() * openTips.length)];
+              if (els().shards?.on) particles.shedShard(tip.x, tip.y, scale());
+              if (els().dust?.on) particles.dustAt([tip], 5, scale());
+            }
           }
         });
       }
@@ -241,7 +342,9 @@
       if (level === 0) return [];
       const s = scale();
       const tips = geom.tipSets.flatMap((tips, hi) =>
-        tips.map((p) => ({ x: p.x, y: p.y, r: s * 0.12, a: geom.handAlpha[hi] })));
+        tips
+          .filter((p) => p.ext > 0.15)
+          .map((p) => ({ x: p.x, y: p.y, r: s * 0.12 * p.ext, a: geom.handAlpha[hi] * p.ext })));
       const palms = geom.palms.map((p, hi) => ({
         x: p.x, y: p.y, r: Math.max(s * 0.18, geom.sizes[hi] * s * 2.2), a: geom.handAlpha[hi] * 0.8,
       }));
@@ -310,7 +413,13 @@
       if (e.nodes?.on) {
         geom.sats.forEach((p) => drawNode(ctx, p, 1.6 * unit, 0.6 * level, nodeRgb, unit, e.glow?.on));
         geom.tipSets.forEach((tips, hi) =>
-          tips.forEach((p) => drawNode(ctx, p, 3.2 * unit, geom.handAlpha[hi], nodeRgb, unit, e.glow?.on)));
+          tips.forEach((p) => {
+            if ((p.ext ?? 1) < 0.08) return;
+            const ext = p.ext ?? 1;
+            const nodeAlpha = geom.handAlpha[hi] * ext;
+            const nodeRadius = 3.2 * unit * (0.4 + 0.6 * ext);
+            drawNode(ctx, p, nodeRadius, nodeAlpha, nodeRgb, unit, e.glow?.on);
+          }));
       }
     }
 
@@ -353,4 +462,6 @@
   }
 
   FX.createPlexusRenderer = createPlexusRenderer;
+  FX.getFingerExtensions = getFingerExtensions;
+  if (typeof module !== 'undefined') module.exports = { createPlexusRenderer, getFingerExtensions };
 })();

@@ -29,7 +29,12 @@ Everyone on your call — whether on **Google Meet, Facebook Messenger, OmeTV, D
 
 ## 🚀 Key Features
 
-### 🖐️ 1. Smart Hand Gestures & Animations
+### 🎯 1. Selective Finger Targeting (Zero Fist Clutter!)
+* **Intelligent Per-Finger Tracking:** When your hand is closed in a fist, zero nodes or messy cluster lines appear!
+* **Target Only What You Open:** Whichever fingers you extend — whether it's an **"L" / Gun shape** (thumb + index), **Pointing** (index only), **Peace sign** (index + middle), **Rock horns** (index + pinky), or **Open hand** — ONLY those active extended fingers light up with neon nodes and laser energy rays radiating directly from your palm!
+* **Silky Smooth Dissolve:** Closed fingers fade out smoothly in milliseconds with continuous exponential decay, giving a high-tech Iron Man holographic feel.
+
+### 🖐️ 2. Smart Hand Gestures & Animations
 Trigger jaw-dropping visual effects simply by moving your hands:
 * ✌️ **Peace / Victory Sign:** Spawns a celebratory burst of fluttering multi-colored confetti and glowing stars.
 * 👍 **Thumbs Up:** Launches golden fireworks and glowing floating thumbs-up emblems.
@@ -37,13 +42,13 @@ Trigger jaw-dropping visual effects simply by moving your hands:
 * 🖐️ **Doctor Strange Mystic Shield:** Open your palm facing the camera to generate a rotating ancient mystic mandala shield with concentric fiery circles and rotating geometric runes.
 * 🔮 **Two-Hand Plasma Energy Ball (Rasengan):** Hold your palms facing each other to create a crackling, swirling plasma energy sphere with live electric arcs bridging your hands!
 
-### ✏️ 2. Air Canvas (Draw in the Air)
+### ✏️ 3. Air Canvas (Draw in the Air)
 * **Air Drawing:** Point your index finger in the air (or pinch thumb and index together) to paint smooth glowing neon ribbon strokes in 3D/2D space!
 * **Smooth Bézier Curves:** Custom quadratic Bézier interpolation ensures your air handwriting is silky-smooth with zero jagged edges.
 * **Custom Colors & Size:** Pick any neon color and brush size from 1px to 25px.
 * **1-Click Wipe:** Clear your air canvas anytime with the on-screen trash button.
 
-### 🎨 3. 10 Stunning Visual Presets
+### 🎨 4. 10 Stunning Visual Presets
 * 🌈 **Rainbow Mode:** Dynamic RGB spectrum cycle that flows seamlessly like gaming RGB lighting.
 * 🧙 **Doctor Strange:** Fiery amber, mystic gold, and glowing orange embers.
 * 🔥 **Fire:** Blazing red, fiery orange, and rising heat sparks.
@@ -51,23 +56,23 @@ Trigger jaw-dropping visual effects simply by moving your hands:
 * 💻 **Matrix:** Digital hacker green code stream and falling glyphs.
 * 💜 **Violet, ❄️ Ice, ⚡ Ember, 💖 Neon, ⚪ Mono**
 
-### 🔊 4. Audio-Reactive Pulse & Sci-Fi Sounds
+### 🔊 5. Audio-Reactive Pulse & Sci-Fi Sounds
 * **Voice & Beat Reactivity:** When you speak or play music, the plexus lines and glow dynamically pulse in thickness and brightness to your voice volume!
 * **Synthesized Audio Chimes:** Built-in subtle sci-fi sound effects when turning on/off or triggering gestures (synthesized via Web Audio API, 100% offline).
 
-### ⚡ 5. Sleek On-Screen Floating HUD
+### ⚡ 6. Sleek On-Screen Floating HUD
 * An interactive glassmorphism control menu floats directly on your video call screen.
 * Change themes, toggle gestures, activate Air Draw, or wipe the canvas in 1 click **without opening browser popups or leaving your call**!
 * **Ghost Menu:** The floating HUD is rendered in your local DOM — **remote callers only see your cool video effects, never the menu!**
 * Can be dragged anywhere on your screen or minimized into a small glowing floating icon (`✨`).
 
-### 🏎️ 6. 60 FPS Ultra-Smooth Performance
+### 🏎️ 7. 60 FPS Ultra-Smooth Performance
 * **Continuous Exponential Motion Interpolation:** Eliminates AI detection micro-stutter for fluid, silky 60fps tracking.
 * **Direct GPU Acceleration:** Front-buffer desynchronized hardware rendering.
 * **Batched Path Strokes:** Reduces canvas draw calls by ~90%.
 * **🌱 Eco Mode:** Built-in battery and CPU/GPU saver for low-end laptops.
 
-### 🔒 7. 100% Privacy & Offline AI
+### 🔒 8. 100% Privacy & Offline AI
 * Powered by bundled on-device **Google MediaPipe Vision AI**.
 * **Zero network calls:** Your webcam feed, microphone, and hand tracking never leave your local computer.
 
