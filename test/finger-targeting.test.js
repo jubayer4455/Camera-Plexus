@@ -225,3 +225,23 @@ test('Finger Gun detects cocked hammer and trigger pull', () => {
   assert.strictEqual(fThumb, 0, 'Thumb lowered (trigger pulled)');
   assert.ok(fIndex > 0.8, 'Index barrel stays aimed');
 });
+
+test('Game Focus Mode isolates game and suppresses other FX', () => {
+  const S = require('../src/settings.js');
+  const defaults = S.sanitize({});
+  assert.strictEqual(defaults.targetGame.on, false);
+  assert.strictEqual(defaults.targetGame.focusMode, true);
+  assert.strictEqual(defaults.targetGame.speed, 'normal');
+
+  // Verify custom settings
+  const custom = S.sanitize({
+    targetGame: { on: true, focusMode: false, speed: 'fast' },
+    gestures: { chidori: false, laserSword: true, fingerGun: true },
+  });
+  assert.strictEqual(custom.targetGame.on, true);
+  assert.strictEqual(custom.targetGame.focusMode, false);
+  assert.strictEqual(custom.targetGame.speed, 'fast');
+  assert.strictEqual(custom.gestures.chidori, false);
+  assert.strictEqual(custom.gestures.laserSword, true);
+  assert.strictEqual(custom.gestures.fingerGun, true);
+});

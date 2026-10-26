@@ -53,13 +53,14 @@ Turn your webcam into an arcade shooting gallery during boring video calls:
 * 🎈 **Drifting Neon Targets:** Translucent cyber balloons with glowing star emblems bob and float upward across your video feed.
 * 🎯 **Laser Sight Reticle:** When your finger gun is aimed and cocked, a dynamic dotted targeting line and holographic crosshair assist your aim!
 * 💥 **Pop & Score:** Hitting a target causes it to pop with an explosive sparkle burst, popping sound, floating `+100` score indicators, and combo multipliers (`Combo 2x, 3x, 5x`)!
-* 🏆 **Live Cyber Scoreboard:** A sleek holographic HUD badge at the top tracks your live score and targets popped in real time!
-* 🔘 **1-Click Game Mode:** Easily toggle the game on or off anytime via the `🎯 Game` button on the floating HUD.
+* 🔒 **Game Focus Mode (No FX Clash):** Eliminates clutter by automatically isolating the game — heavy anime FX (like giant shields or webs) are silenced during the game so your screen stays crystal-clear for shooting!
+* 🏆 **Live Cyber Scoreboard:** Sleek holographic badges on your screen and HUD track your live score, combo multiplier, and targets popped in real time!
+* 🔘 **Dedicated Game Controls:** Toggle game on/off, switch between normal & fast balloon speeds, or reset your score with 1 click!
 
 ### ✏️ 4. Air Canvas (Draw in the Air)
 * **Air Drawing:** Point your index finger in the air (or pinch thumb and index together) to paint smooth glowing neon ribbon strokes in 3D/2D space!
 * **Smooth Bézier Curves:** Custom quadratic Bézier interpolation ensures your air handwriting is silky-smooth with zero jagged edges.
-* **Custom Colors & Size:** Pick any neon color and brush size from 1px to 25px.
+* **Custom Colors & Size:** Pick any neon color (Cyan, Pink, Yellow, Lime, White) and brush sizes directly on the HUD.
 * **1-Click Wipe:** Clear your air canvas anytime with the on-screen trash button.
 
 ### 🎨 5. 10 Stunning Visual Presets
@@ -74,11 +75,20 @@ Turn your webcam into an arcade shooting gallery during boring video calls:
 * **Voice & Beat Reactivity:** When you speak or play music, the plexus lines and glow dynamically pulse in thickness and brightness to your voice volume!
 * **Synthesized Audio Chimes:** Built-in subtle sci-fi sound effects when turning on/off or triggering gestures (synthesized via Web Audio API, 100% offline).
 
-### ⚡ 7. Sleek On-Screen Floating HUD
-* An interactive glassmorphism control menu floats directly on your video call screen.
-* Change themes, toggle gestures, activate Air Draw, or wipe the canvas in 1 click **without opening browser popups or leaving your call**!
-* **Ghost Menu:** The floating HUD is rendered in your local DOM — **remote callers only see your cool video effects, never the menu!**
-* Can be dragged anywhere on your screen or minimized into a small glowing floating icon (`✨`).
+### ⚡ 7. Organized Tabbed Floating HUD (Independent Control for Every FX)
+* **4 Organized Tabs:** Instantly switch between `🦸 FX`, `🎯 Game`, `✏️ Draw`, and `⚙️ Setup`.
+* **Individual Buttons for Every Effect:** Turn any effect on or off independently without affecting others:
+  - ⚡ **Chidori** [ON/OFF]
+  - 🕸️ **Spider-Man Web** [ON/OFF]
+  - 🔥 **Super Saiyan Aura** [ON/OFF]
+  - ⚔️ **Laser Lightsaber** [ON/OFF]
+  - 🛡️ **Doctor Strange Shield** [ON/OFF]
+  - 🔮 **Energy Ball** [ON/OFF]
+  - 🎉 **Party Confetti & Fireworks** [ON/OFF]
+  - 🔫 **Standalone Finger Gun** [ON/OFF]
+  - 🕸️ **Plexus Network Mesh** [ON/OFF]
+* **Touch-Friendly & Draggable:** Works on both PC and mobile touchscreens (Kiwi Browser). Easily drag anywhere or minimize into a floating glowing icon (`✨`).
+* **Ghost Menu:** Rendered locally in your DOM — **remote callers only see your cool video effects, never the menu!**
 
 ### 🏎️ 8. Ultra-Smooth 60 FPS Performance & Mobile Optimizer
 * **Adaptive Mobile Downscaling:** Automatically senses mobile devices (e.g. Kiwi Browser on Android) and dynamically switches to a featherweight 320p inference pipeline — slashing CPU/GPU load by over 55% for buttery 60 FPS tracking without phone heating or battery drain!

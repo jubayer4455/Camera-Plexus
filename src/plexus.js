@@ -458,6 +458,8 @@
       lightSources,
       level: () => level,
       clearDrawings: () => gestures?.clearDrawings(),
+      getGameStats: () => gestures?.getGameStats?.() || { score: 0, combo: 1, hits: 0 },
+      resetGame: () => gestures?.resetGame?.(),
     };
   }
 

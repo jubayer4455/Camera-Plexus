@@ -50,6 +50,7 @@
     let scorePopups = []; // { x, y, text, alpha, life, vy, color }
     let muzzleFlashes = []; // { x, y, radius, alpha, color }
     let gunStates = { left: 'idle', right: 'idle' };
+    let gunAngles = { left: 0, right: 0 };
     let lastBalloonSpawnAt = 0;
 
     // Trigger cooldowns to prevent spamming single-shot bursts
@@ -317,21 +318,26 @@
     function update(detectedHands, now, settings, w, h) {
       const aspect = w / h;
       const gConfig = settings.gestures || {};
-      const gesturesActive = gConfig.on;
+      const gesturesActive = Boolean(gConfig.on);
+      const gameOn = Boolean(settings.targetGame?.on);
+      const gameFocus = gameOn && (settings.targetGame?.focusMode !== false);
+      const fxAllowed = gesturesActive && !gameFocus;
+      const partyAllowed = fxAllowed && (gConfig.party !== false);
+      const gunAllowed = gameOn || (gesturesActive && gConfig.fingerGun !== false);
       const dt = 0.033; // ~30fps frame interval
 
       // 1. Analyze single hands
       const analyses = detectedHands.map((h) => analyzeHand(h, aspect)).filter(Boolean);
 
-      if (analyses.length === 0) {
-        chidoriAlpha.left = 0;
-        chidoriAlpha.right = 0;
-        laserSwordAlpha.left = 0;
-        laserSwordAlpha.right = 0;
-        shieldAlpha.left = 0;
-        shieldAlpha.right = 0;
-        energyBallAlpha = 0;
-        superSaiyanAlpha = 0;
+      if (analyses.length === 0 || !fxAllowed) {
+        chidoriAlpha.left = lerp(chidoriAlpha.left, 0, 0.25);
+        chidoriAlpha.right = lerp(chidoriAlpha.right, 0, 0.25);
+        laserSwordAlpha.left = lerp(laserSwordAlpha.left, 0, 0.25);
+        laserSwordAlpha.right = lerp(laserSwordAlpha.right, 0, 0.25);
+        shieldAlpha.left = lerp(shieldAlpha.left, 0, 0.25);
+        shieldAlpha.right = lerp(shieldAlpha.right, 0, 0.25);
+        energyBallAlpha = lerp(energyBallAlpha, 0, 0.25);
+        superSaiyanAlpha = lerp(superSaiyanAlpha, 0, 0.25);
       }
 
       // Check single-hand gestures
@@ -341,23 +347,23 @@
         const sideKey = idx === 0 ? 'left' : 'right';
 
         // Peace sign
-        if (gesturesActive && gConfig.peace && a.isPeace && now - lastPeaceAt > BURST_COOLDOWN_MS) {
+        if (partyAllowed && gConfig.peace && a.isPeace && now - lastPeaceAt > BURST_COOLDOWN_MS) {
           lastPeaceAt = now;
           spawnConfetti({ x: px, y: py });
         }
 
         // Thumbs Up
-        if (gesturesActive && gConfig.thumbsUp && a.isThumbsUp && now - lastThumbAt > BURST_COOLDOWN_MS) {
+        if (partyAllowed && gConfig.thumbsUp && a.isThumbsUp && now - lastThumbAt > BURST_COOLDOWN_MS) {
           lastThumbAt = now;
           spawnFireworks({ x: a.thumbTip.x * w, y: a.thumbTip.y * h });
         }
 
         // Mystic shield on open palm
-        const wantShield = gesturesActive && gConfig.mysticShield && a.isOpenPalm;
+        const wantShield = fxAllowed && gConfig.mysticShield && a.isOpenPalm;
         shieldAlpha[sideKey] = lerp(shieldAlpha[sideKey], wantShield ? 1 : 0, 0.15);
 
         // ⚡ Chidori (Naruto Lightning Fist)
-        const wantChidori = gesturesActive && gConfig.chidori && a.isFist;
+        const wantChidori = fxAllowed && gConfig.chidori && a.isFist;
         chidoriAlpha[sideKey] = lerp(chidoriAlpha[sideKey], wantChidori ? 1 : 0, 0.2);
         chidoriPositions[sideKey] = { x: a.palm.x * w, y: a.palm.y * h };
         if (wantChidori && now - lastChidoriSoundAt > 1400) {
@@ -366,14 +372,14 @@
         }
 
         // 🕸️ Spider-Man Web Shoot (🤟)
-        if (gesturesActive && gConfig.spiderWeb && a.isSpiderMan && now - lastWebShootAt > 850) {
+        if (fxAllowed && gConfig.spiderWeb && a.isSpiderMan && now - lastWebShootAt > 850) {
           lastWebShootAt = now;
           spawnSpiderWeb({ x: a.palm.x * w, y: a.palm.y * h }, w, h);
           FX.playSound?.('web');
         }
 
         // ⚔️ Laser Sword / Lightsaber
-        const wantSword = gesturesActive && gConfig.laserSword && a.isSword;
+        const wantSword = fxAllowed && gConfig.laserSword && a.isSword;
         laserSwordAlpha[sideKey] = lerp(laserSwordAlpha[sideKey], wantSword ? 1 : 0, 0.2);
         if (wantSword) {
           laserSwordAngles[sideKey] = a.swordAngle;
@@ -388,7 +394,8 @@
         }
 
         // 🔫 Finger Gun (shooting laser bullets)
-        if (a.isGunShape) {
+        if (gunAllowed && a.isGunShape) {
+          gunAngles[sideKey] = a.barrelAngle;
           if (a.thumbCocked && gunStates[sideKey] !== 'cocked') {
             gunStates[sideKey] = 'cocked';
           } else if (a.thumbPulled && gunStates[sideKey] === 'cocked') {
@@ -417,8 +424,8 @@
           gunStates[sideKey] = 'idle';
         }
 
-        // Air Drawing
-        if (settings.airDraw?.on) {
+        // Air Drawing (isolated during gameFocus)
+        if (settings.airDraw?.on && !gameFocus) {
           const isDrawing = a.isPoint || a.isPinch;
           const drawPt = { x: px, y: py, t: now };
           if (isDrawing) {
@@ -470,14 +477,14 @@
         const indexDist = dist(i1, i2);
         const thumbDist = dist(t1, t2);
 
-        if (gesturesActive && gConfig.heart && indexDist < 0.45 * avgSize && thumbDist < 0.45 * avgSize &&
+        if (partyAllowed && gConfig.heart && indexDist < 0.45 * avgSize && thumbDist < 0.45 * avgSize &&
             now - lastHeartAt > BURST_COOLDOWN_MS) {
           lastHeartAt = now;
           spawnHearts({ x: (i1.x + i2.x) / 2, y: (i1.y + i2.y) / 2 }, 6);
         }
 
         // Energy / Plasma Ball (two hands facing each other)
-        const wantBall = gesturesActive && gConfig.energyBall &&
+        const wantBall = fxAllowed && gConfig.energyBall &&
           palmDist > 0.6 * avgSize && palmDist < 2.4 * avgSize;
         energyBallAlpha = lerp(energyBallAlpha, wantBall ? 1 : 0, 0.12);
         energyCenter = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
@@ -503,7 +510,7 @@
         const rawHandSpan = Math.abs(h1.wrist.x - h2.wrist.x) / aspect;
         const isSpread = rawHandSpan > 0.38;
         const isChestHeight = h1.wrist.y > 0.20 && h1.wrist.y < 0.92 && h2.wrist.y > 0.20 && h2.wrist.y < 0.92;
-        const wantSaiyan = gesturesActive && gConfig.superSaiyan && isSpread && isChestHeight;
+        const wantSaiyan = fxAllowed && gConfig.superSaiyan && isSpread && isChestHeight;
         superSaiyanAlpha = lerp(superSaiyanAlpha, wantSaiyan ? 1 : 0, 0.14);
         if (wantSaiyan && now - lastSaiyanSoundAt > 2800) {
           lastSaiyanSoundAt = now;
@@ -566,8 +573,9 @@
 
       if (gameOn) {
         // Spawn floating neon cyber balloons
+        const speedMul = (settings.targetGame?.speed === 'fast') ? 1.45 : 1.0;
         const maxBalloons = FX.isMobile ? 3 : 5;
-        const spawnInterval = FX.isMobile ? 2200 : 1600;
+        const spawnInterval = (FX.isMobile ? 2200 : 1600) / speedMul;
         if (balloons.length < maxBalloons && now - lastBalloonSpawnAt > spawnInterval) {
           lastBalloonSpawnAt = now;
           const colors = ['#00ffff', '#ff007f', '#ffff00', '#00ff66', '#a878ff', '#ff8800'];
@@ -576,13 +584,15 @@
             id: Math.random(),
             x: w * (0.15 + Math.random() * 0.7),
             y: h + 30,
-            vx: (Math.random() - 0.5) * 45,
-            vy: -75 - Math.random() * 65,
+            vx: (Math.random() - 0.5) * 45 * speedMul,
+            vy: (-75 - Math.random() * 65) * speedMul,
             radius: (26 + Math.random() * 10) * (Math.min(w, h) / 720),
             color: col,
             seed: Math.random() * 100,
           });
         }
+      } else if (balloons.length > 0) {
+        balloons = [];
       }
 
       // Update balloons
@@ -1444,7 +1454,7 @@
           const sideKey = i === 0 ? 'left' : 'right';
           if (gunStates[sideKey] === 'cocked') {
             const tip = hd.tips && hd.tips[1] ? { x: hd.tips[1].x * w, y: hd.tips[1].y * h } : { x: hd.palm.x * w, y: hd.palm.y * h };
-            const ang = laserSwordAngles[sideKey] || 0;
+            const ang = gunAngles[sideKey] || 0;
             drawAimSight(ctx, tip, ang, w, h, unit);
           }
         });
@@ -1504,12 +1514,36 @@
       ctx.restore();
     }
 
-    return {
+    function getGameStats() {
+      return {
+        score: gameScore,
+        combo: gameCombo,
+        hits: targetsPopped,
+      };
+    }
+
+    function resetGame() {
+      gameScore = 0;
+      gameCombo = 1;
+      targetsPopped = 0;
+      balloons = [];
+      bullets = [];
+      scorePopups = [];
+      muzzleFlashes = [];
+    }
+
+    const manager = {
       update,
       draw,
       clearDrawings,
+      getGameStats,
+      resetGame,
     };
+    FX.activeGestures = manager;
+    return manager;
   }
 
+  FX.getGameStats = () => FX.activeGestures?.getGameStats?.() || { score: 0, combo: 1, hits: 0 };
+  FX.resetGame = () => FX.activeGestures?.resetGame?.();
   FX.createGestureManager = createGestureManager;
 })();

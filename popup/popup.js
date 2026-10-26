@@ -104,16 +104,32 @@
     // Gestures
     bindCheck('gesturesOn', () => settings.gestures?.on,
       (on) => ({ ...settings, gestures: { ...settings.gestures, on } })),
+    bindCheck('gestureChidori', () => settings.gestures?.chidori,
+      (chidori) => ({ ...settings, gestures: { ...settings.gestures, chidori } })),
+    bindCheck('gestureSpiderWeb', () => settings.gestures?.spiderWeb,
+      (spiderWeb) => ({ ...settings, gestures: { ...settings.gestures, spiderWeb } })),
+    bindCheck('gestureSuperSaiyan', () => settings.gestures?.superSaiyan,
+      (superSaiyan) => ({ ...settings, gestures: { ...settings.gestures, superSaiyan } })),
+    bindCheck('gestureLaserSword', () => settings.gestures?.laserSword,
+      (laserSword) => ({ ...settings, gestures: { ...settings.gestures, laserSword } })),
+    bindCheck('gestureFingerGun', () => settings.gestures?.fingerGun,
+      (fingerGun) => ({ ...settings, gestures: { ...settings.gestures, fingerGun } })),
+    bindCheck('gestureShield', () => settings.gestures?.mysticShield,
+      (mysticShield) => ({ ...settings, gestures: { ...settings.gestures, mysticShield } })),
+    bindCheck('gestureBall', () => settings.gestures?.energyBall,
+      (energyBall) => ({ ...settings, gestures: { ...settings.gestures, energyBall } })),
     bindCheck('gesturePeace', () => settings.gestures?.peace,
       (peace) => ({ ...settings, gestures: { ...settings.gestures, peace } })),
     bindCheck('gestureThumbsUp', () => settings.gestures?.thumbsUp,
       (thumbsUp) => ({ ...settings, gestures: { ...settings.gestures, thumbsUp } })),
     bindCheck('gestureHeart', () => settings.gestures?.heart,
       (heart) => ({ ...settings, gestures: { ...settings.gestures, heart } })),
-    bindCheck('gestureShield', () => settings.gestures?.mysticShield,
-      (mysticShield) => ({ ...settings, gestures: { ...settings.gestures, mysticShield } })),
-    bindCheck('gestureBall', () => settings.gestures?.energyBall,
-      (energyBall) => ({ ...settings, gestures: { ...settings.gestures, energyBall } })),
+
+    // Interactive Target Game
+    bindCheck('targetGameOn', () => settings.targetGame?.on,
+      (on) => ({ ...settings, targetGame: { ...settings.targetGame, on } })),
+    bindCheck('targetGameFocus', () => settings.targetGame?.focusMode !== false,
+      (focusMode) => ({ ...settings, targetGame: { ...settings.targetGame, focusMode } })),
 
     // Air Drawing
     bindCheck('airDrawOn', () => settings.airDraw?.on,
@@ -174,10 +190,19 @@
 
     // Disable child gesture rows when master switch is OFF
     const gActive = !!settings.gestures?.on;
-    ['gesturePeace', 'gestureThumbsUp', 'gestureHeart', 'gestureShield', 'gestureBall'].forEach((id) => {
+    [
+      'gestureChidori', 'gestureSpiderWeb', 'gestureSuperSaiyan', 'gestureLaserSword',
+      'gestureFingerGun', 'gestureShield', 'gestureBall', 'gesturePeace',
+      'gestureThumbsUp', 'gestureHeart',
+    ].forEach((id) => {
       const row = $(id)?.closest('.row');
       if (row) row.classList.toggle('disabled', !gActive);
     });
+
+    // Disable target game child rows when game switch is OFF
+    const gameActive = !!settings.targetGame?.on;
+    const focusRow = $('targetGameFocus')?.closest('.row');
+    if (focusRow) focusRow.classList.toggle('disabled', !gameActive);
 
     // Disable air draw child rows when master switch is OFF
     const airActive = !!settings.airDraw?.on;
