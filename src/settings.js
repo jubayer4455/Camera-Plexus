@@ -3,8 +3,10 @@
 // or stale stored value can never break rendering.
 (() => {
   const ELEMENTS = ['lines', 'glow', 'triangles', 'nodes', 'shards', 'dust'];
+  const SCHEMA_VERSION = 3;
 
   const DEFAULTS = Object.freeze({
+    schemaVersion: SCHEMA_VERSION,
     enabled: true,
     elements: {
       lines: { on: true, color: '#ffffff' },
@@ -63,7 +65,7 @@
     DoctorStrange: { lines: '#ffe7a3', glow: '#ff7700', triangles: '#ff4800', nodes: '#ffffff', shards: '#ffaa33', dust: '#ffcc66' },
     Fire: { lines: '#fff0a6', glow: '#ff3300', triangles: '#ff6600', nodes: '#ffffff', shards: '#ff2200', dust: '#ff9900' },
     Cyberpunk: { lines: '#00ffff', glow: '#ff007f', triangles: '#7928ca', nodes: '#ffff00', shards: '#00ffff', dust: '#ff007f' },
-    Matrix: { lines: '#00ff66', glow: '#00cc44', triangles: '#005522', nodes: '#88ffaa', shards: '#00ff44', dust: '#44ff88' },
+    Matrix: { lines: '#d6ffe4', glow: '#00ff66', triangles: '#00e655', nodes: '#ffffff', shards: '#55ff99', dust: '#88ffbb' },
     Rainbow: { lines: '#ffffff', glow: '#ff3399', triangles: '#33ccff', nodes: '#ffff33', shards: '#ff33ff', dust: '#33ff99' },
   };
 
@@ -103,6 +105,7 @@
     const rb = src.rainbow || {};
 
     return {
+      schemaVersion: SCHEMA_VERSION,
       enabled: bool(src.enabled, DEFAULTS.enabled),
       elements,
       darken: clamp(src.darken, 0, 60, DEFAULTS.darken),
@@ -184,7 +187,7 @@
     return `${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}`;
   }
 
-  const api = { ELEMENTS, DEFAULTS, PRESETS, LABELS, sanitize, applyPreset, rgb, rainbowRgb };
+  const api = { SCHEMA_VERSION, ELEMENTS, DEFAULTS, PRESETS, LABELS, sanitize, applyPreset, rgb, rainbowRgb };
   globalThis.__plexusSettings = api;
   if (typeof module !== 'undefined') module.exports = api;
 })();

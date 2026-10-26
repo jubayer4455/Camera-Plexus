@@ -32,18 +32,44 @@
     if (root) root.appendChild(iframe);
 
     const state = { ready: false, failed: null, inflightSince: null };
-    const loadTimer = setTimeout(() => {
+    let timeoutCount = 0;
+    let reloadAttemptAt = 0;
+    let loadTimer = setTimeout(() => {
       if (!state.ready && !state.failed) {
         state.failed = 'hand tracker frame did not load';
         onStatus('error', state.failed);
       }
     }, LOAD_TIMEOUT_MS);
 
+    function reloadDetectorFrame() {
+      const now = performance.now();
+      if (now - reloadAttemptAt < 3000) return;
+      reloadAttemptAt = now;
+      timeoutCount = 0;
+      state.ready = false;
+      state.failed = null;
+      state.inflightSince = null;
+      clearTimeout(loadTimer);
+      try {
+        const u = new URL('detector/detector.html', baseUrl);
+        u.searchParams.set('t', String(Date.now()));
+        iframe.src = u.href;
+      } catch (_) {}
+      loadTimer = setTimeout(() => {
+        if (!state.ready && !state.failed) {
+          state.failed = 'hand tracker frame did not load';
+          onStatus('error', state.failed);
+        }
+      }, LOAD_TIMEOUT_MS);
+    }
+
     function onMessage(event) {
       if (event.origin !== origin || event.source !== iframe.contentWindow) return;
       const msg = event.data || {};
       if (msg.type === 'plexus:ready') {
         state.ready = true;
+        state.failed = null;
+        timeoutCount = 0;
         clearTimeout(loadTimer);
         onStatus('ready', msg.delegate);
       }
@@ -54,6 +80,7 @@
       }
       if (msg.type === 'plexus:hands') {
         state.inflightSince = null;
+        timeoutCount = 0;
         onHands(msg.hands || [], performance.now(), msg.mask || null);
       }
       if (msg.type === 'plexus:segment-error') onStatus('segment-error', msg.message);
@@ -64,6 +91,14 @@
     async function submit(frame, segment = false) {
       const now = performance.now();
       if (now - lastSubmitTime < MIN_SUBMIT_INTERVAL_MS) return;
+      if (state.inflightSince !== null && now - state.inflightSince >= REPLY_TIMEOUT_MS) {
+        state.inflightSince = null;
+        timeoutCount += 1;
+        if (timeoutCount >= 2) {
+          reloadDetectorFrame();
+          return;
+        }
+      }
       const busy = state.inflightSince !== null && now - state.inflightSince < REPLY_TIMEOUT_MS;
       if (!iframe.isConnected) {
         const r = document.documentElement || document.body;

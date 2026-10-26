@@ -15,6 +15,12 @@
     const stopOut = out.stop.bind(out);
     Object.defineProperties(out, {
       label: { get: () => src.label, configurable: true },
+      muted: { get: () => false, configurable: true },
+      enabled: {
+        get: () => src.enabled,
+        set: (v) => { src.enabled = Boolean(v); },
+        configurable: true,
+      },
       stop: {
         value: () => {
           src.stop();
@@ -33,6 +39,10 @@
       getConstraints: { value: () => src.getConstraints(), configurable: true },
       applyConstraints: { value: (c) => src.applyConstraints(c), configurable: true },
     });
+    try {
+      src.__plexusWrapped = true;
+      out.__plexusWrapped = true;
+    } catch (_) {}
     src.addEventListener('ended', () => stopOut());
     return out;
   }
@@ -81,13 +91,18 @@
 
   FX.wrapStream = (stream) => {
     if (!stream || stream.__plexusWrapped) return stream;
+    const vTracks = typeof stream.getVideoTracks === 'function' ? stream.getVideoTracks() : [];
+    if (!vTracks.length || vTracks.every((t) => t.__plexusWrapped)) {
+      try { stream.__plexusWrapped = true; } catch (_) {}
+      return stream;
+    }
     const engine = FX.getEngine();
     const audio = stream.getAudioTracks();
     if (audio.length) {
       FX.audioSource = audio[0];
       engine.attachAudio(audio[0]);
     }
-    const video = stream.getVideoTracks().map((t) => processVideoTrack(t, engine));
+    const video = vTracks.map((t) => (t.__plexusWrapped ? t : processVideoTrack(t, engine)));
     const out = new MediaStream([...audio, ...video]);
     try {
       stream.__plexusWrapped = true;

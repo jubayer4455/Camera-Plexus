@@ -68,6 +68,9 @@ function toMask(result, srcW, srcH) {
 }
 
 let landmarker = null;
+let currentDelegate = 'GPU';
+let consecutiveErrors = 0;
+let switchingToCpu = false;
 let segmenter = null;
 let segmenterLoading = null;
 let lastTimestamp = 0;
@@ -104,9 +107,21 @@ window.addEventListener('message', (event) => {
     }
     lastTimestamp = Math.max(lastTimestamp + 1, Math.round(performance.now()));
     const hands = toHands(landmarker.detectForVideo(bitmap, lastTimestamp));
+    consecutiveErrors = 0;
     const mask = msg.segment ? segment(bitmap, lastTimestamp) : null;
     reply({ type: 'plexus:hands', hands, mask }, mask ? [mask.data] : []);
   } catch (error) {
+    consecutiveErrors += 1;
+    if (consecutiveErrors >= 3 && currentDelegate === 'GPU' && !switchingToCpu) {
+      switchingToCpu = true;
+      createLandmarker('CPU')
+        .then((cpuTask) => {
+          landmarker = cpuTask;
+          currentDelegate = 'CPU';
+          consecutiveErrors = 0;
+        })
+        .catch(() => {});
+    }
     reply({ type: 'plexus:hands', hands: [] });
   } finally {
     bitmap.close();
@@ -116,6 +131,7 @@ window.addEventListener('message', (event) => {
 withDelegate(createLandmarker)
   .then((created) => {
     landmarker = created.task;
+    currentDelegate = created.delegate;
     reply({ type: 'plexus:ready', delegate: created.delegate });
   })
   .catch((error) => reply({ type: 'plexus:error', message: String(error?.message || error) }));

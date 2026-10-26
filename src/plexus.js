@@ -13,7 +13,7 @@
   const PALM_IDS = [0, 5, 9, 17];
   const SATELLITES = 7;
   const FADE_MS = 400;
-  const HAND_TIMEOUT_MS = 380;
+  const HAND_TIMEOUT_MS = 500;
   const DUST_PER_SECOND = 200;
   const DISSOLVE_DUST = 550;
 
@@ -121,7 +121,7 @@
         ext: [...targetExt],
         seenAt: now,
         speed: 0,
-        vis: 0,
+        vis: 0.9,
       };
     }
 
@@ -287,6 +287,7 @@
         level = 0;
         return;
       }
+      if (target === 0) target = 1;
       const dt = lastTick === null ? 0 : Math.min((now - lastTick) / 1000, 0.08);
       lastTick = now;
       const step = (dt * 1000) / FADE_MS;
@@ -301,7 +302,7 @@
         [...hands]
           .filter(([, hd]) => now - hd.seenAt < HAND_TIMEOUT_MS)
           .map(([k, hd]) => {
-            const visible = now - hd.seenAt < 120 ? 1 : 0;
+            const visible = now - hd.seenAt < 340 ? 1 : 0;
             const updatedExt = (hd.ext || [1, 1, 1, 1, 1]).map((val, i) =>
               lerp(val, hd.targetExt ? hd.targetExt[i] : 1, extFactor)
             );
@@ -436,8 +437,8 @@
       if (e.triangles?.on) {
         geom.facets.forEach((f) => fill(ctx, f, triRgb, glowRgb));
       }
-      if (e.glow?.on) strokeBatched(ctx, geom.segments, glowRgb, 6 * unit * audioPulse, 0.22);
-      if (e.lines?.on) strokeBatched(ctx, geom.segments, lineRgb, 1.4 * unit * audioPulse, 0.95);
+      if (e.glow?.on) strokeBatched(ctx, geom.segments, glowRgb, 6.5 * unit * audioPulse, 0.38);
+      if (e.lines?.on) strokeBatched(ctx, geom.segments, lineRgb, 1.8 * unit * audioPulse, 0.96);
       if (e.nodes?.on) {
         geom.sats.forEach((p) => drawNode(ctx, p, 1.6 * unit, 0.6 * level, nodeRgb, unit, e.glow?.on));
         geom.tipSets.forEach((tips, hi) =>

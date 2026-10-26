@@ -9,6 +9,7 @@
     document.documentElement.dataset.plexusBase = baseUrl;
   }
 
+  const SCHEMA_VERSION = 3;
   let state = { active: true, engine: false, tracking: 'ready' };
   const post = (type, extra = {}) => window.postMessage({ __plexus: type, baseUrl, ...extra }, '*');
 
@@ -25,11 +26,17 @@
           if (localRes && localRes.settings) settings = localRes.settings;
         } catch (_) {}
       }
+      // Discard stale pre-v3 stored settings where FX or Mesh lines were turned off during earlier testing
+      if (settings && settings.schemaVersion !== SCHEMA_VERSION) {
+        settings = null;
+        try { chrome.storage.sync.remove('settings').catch(() => {}); } catch (_) {}
+        try { chrome.storage.local.remove('settings').catch(() => {}); } catch (_) {}
+      }
       if (settings) {
         if (typeof settings.enabled === 'boolean') state.active = settings.enabled;
         post('settings', { settings });
       } else {
-        post('base', { baseUrl });
+        post('reset-defaults', { baseUrl });
       }
     } catch (error) {
       post('base', { baseUrl });

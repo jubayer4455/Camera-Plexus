@@ -490,6 +490,9 @@
               <option value="Rainbow">Rainbow</option>
               <option value="Mono">Mono</option>
             </select>
+            <button class="plexus-hud-btn" id="plexus-btn-reset-all" title="Reset all themes, mesh lines, and superhero FX to default ON" style="flex: 0 0 auto; padding: 6px 9px;">
+              <span>🔄 Reset</span>
+            </button>
           </div>
           <div class="plexus-hud-row">
             <button class="plexus-hud-btn" id="plexus-btn-audio" title="Glow pulses with your voice">
@@ -827,6 +830,22 @@
       });
     }
 
+    const resetAllBtn = container.querySelector('#plexus-btn-reset-all');
+    if (resetAllBtn) {
+      resetAllBtn.addEventListener('click', () => {
+        pressEffect(resetAllBtn);
+        const S = getSettingsModule();
+        if (S) {
+          FX.settings = S.sanitize({});
+          saveSettings(FX.settings);
+          FX.setActive?.(true);
+          FX.engine?.setActive?.(true);
+          FX.showStatus?.('Reset: All FX & Mesh ON (Violet preset)', 'ok');
+          updateHUD();
+        }
+      });
+    }
+
     const audioBtn = container.querySelector('#plexus-btn-audio');
     if (audioBtn) {
       audioBtn.addEventListener('click', () => {
@@ -1006,19 +1025,39 @@
       }
     }
 
-    // Dynamic Footer hint
+    // Dynamic Footer status & diagnostic feedback
     const footer = container.querySelector('#plexus-hud-footer');
     if (footer) {
-      if (cfg.targetGame?.on) {
-        footer.textContent = cfg.targetGame?.focusMode !== false
-          ? '🎯 Game Active (Focus Mode: Other FX muted)'
-          : '🎯 Game Active (All FX running simultaneously)';
-      } else if (cfg.airDraw?.on) {
-        footer.textContent = '✏️ Air Drawing: Point index finger to draw';
-      } else if (cfg.gestures?.on) {
-        footer.textContent = '🦸 FX Ready: Chidori (Fist), Web (🤟), Saiyan (Spread), Saber (Sword)';
+      if (!FX.engine) {
+        footer.textContent = '📷 Waiting for camera... (Start camera or refresh tab)';
+        footer.style.color = '#ffb366';
       } else {
-        footer.textContent = '⚡ Camera Plexus Ready';
+        const engStats = typeof FX.engine.stats === 'function' ? FX.engine.stats() : null;
+        const trackerStatus = engStats?.tracker;
+        if (trackerStatus && trackerStatus.ready !== true && !trackerStatus.failed) {
+          footer.textContent = '⏳ Loading AI Hand Tracker...';
+          footer.style.color = '#ffcc00';
+        } else if (trackerStatus?.failed) {
+          footer.textContent = '⚠️ Tracker: Reload tab or click Reset';
+          footer.style.color = '#ff6666';
+        } else if (!active) {
+          footer.textContent = '⚡ Effect paused · Click Power ON to resume';
+          footer.style.color = '#999';
+        } else if (cfg.targetGame?.on) {
+          footer.textContent = cfg.targetGame?.focusMode !== false
+            ? '🎯 Game Active (Focus Mode: Other FX muted)'
+            : '🎯 Game Active (All FX running simultaneously)';
+          footer.style.color = '#ff66c4';
+        } else if (cfg.airDraw?.on) {
+          footer.textContent = '✏️ Air Drawing: Point index finger to draw';
+          footer.style.color = '#00ffff';
+        } else if (engStats && engStats.hands > 0) {
+          footer.textContent = `🟢 Hand Detected (${engStats.hands}) · FX & Mesh Active!`;
+          footer.style.color = '#4ade80';
+        } else {
+          footer.textContent = '🟢 AI Ready · Show your hand clearly to camera';
+          footer.style.color = '#a878ff';
+        }
       }
     }
   }

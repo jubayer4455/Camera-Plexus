@@ -353,7 +353,14 @@
       } catch (_) {}
     }
 
+    if (stored && S && stored.schemaVersion !== S.SCHEMA_VERSION) {
+      stored = null;
+    }
     if (S) settings = S.sanitize(stored || {});
+    if (!stored && S) {
+      try { chrome.storage.sync.set({ settings }).catch(() => {}); } catch (_) {}
+      try { chrome.storage.local.set({ settings }).catch(() => {}); } catch (_) {}
+    }
     render();
     showState({ active: settings.enabled !== false, engine: false });
 

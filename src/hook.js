@@ -65,7 +65,18 @@
   function setMasterActive(on) {
     const next = Boolean(on);
     FX.active = next;
-    FX.settings = S.sanitize({ ...FX.settings, enabled: next });
+    const patch = { enabled: next };
+    // If turning Master Power ON while both Mesh and Game/Draw are off, restore Mesh & FX so effects are visible
+    if (next && FX.settings?.elements?.lines?.on === false && !FX.settings?.targetGame?.on && !FX.settings?.airDraw?.on) {
+      const els = FX.settings?.elements || {};
+      const nextElements = {};
+      ['lines', 'glow', 'triangles', 'nodes', 'shards', 'dust'].forEach((k) => {
+        nextElements[k] = { ...(els[k] || {}), on: true };
+      });
+      patch.elements = nextElements;
+      patch.gestures = { ...(FX.settings?.gestures || {}), on: true };
+    }
+    FX.settings = S.sanitize({ ...FX.settings, ...patch });
     post('save-settings', { settings: FX.settings });
     if (FX.engine) {
       if (FX.engine.isActive() !== next) {
@@ -99,8 +110,10 @@
         const stream = v.srcObject;
         if (stream && typeof stream.getVideoTracks === 'function' && !stream.__plexusWrapped) {
           const tracks = stream.getVideoTracks();
-          if (tracks.length > 0 && tracks[0].readyState === 'live') {
+          if (tracks.length > 0 && tracks[0].readyState === 'live' && !tracks[0].__plexusWrapped) {
+            const wasPaused = v.paused;
             v.srcObject = FX.wrapStream(stream);
+            if (!wasPaused) v.play().catch(() => {});
           }
         }
       });
@@ -127,6 +140,13 @@
       }
       scanExistingVideos();
     }
+    if (msg.__plexus === 'reset-defaults') {
+      FX.settings = S.sanitize({});
+      FX.active = true;
+      post('save-settings', { settings: FX.settings });
+      if (FX.engine && !FX.engine.isActive()) FX.engine.setActive(true);
+      FX.updateHUD?.();
+    }
     if (msg.__plexus === 'settings' && msg.settings) {
       const prevSound = FX.settings.clapSound;
       FX.settings = S.sanitize(msg.settings);
@@ -148,11 +168,14 @@
   post('hello');
   setTimeout(scanExistingVideos, 500);
   setTimeout(scanExistingVideos, 2000);
+  setInterval(scanExistingVideos, 1500);
 
-  const announce = () => FX.showStatus('loaded · waiting for your camera', 'info', true);
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', announce, { once: true });
-  } else {
-    announce();
+  if (window.self === window.top) {
+    const announce = () => FX.showStatus('loaded · waiting for your camera', 'info', true);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', announce, { once: true });
+    } else {
+      announce();
+    }
   }
 })();

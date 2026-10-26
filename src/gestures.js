@@ -147,9 +147,9 @@
       // Spider-Man (🤟): Index and Pinky extended; Middle and Ring curled
       const isSpiderMan = indexExt && pinkyExt && middleCurled && ringCurled;
 
-      // Open Palm: All 4 fingers + thumb extended outward
+      // Open Palm: All 4 fingers extended outward (natural open hand, even if thumb is relaxed)
       const isOpenPalm = indexExt && middleExt && ringExt && pinkyExt &&
-        dist(thumbTip, pinkyTip) > 0.72 * hSize;
+        dist(indexTip, pinkyTip) > 0.35 * hSize;
 
       // Pinch: Thumb tip very close to Index tip
       const isPinch = dist(thumbTip, indexTip) < 0.24 * hSize;
