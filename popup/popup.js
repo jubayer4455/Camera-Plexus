@@ -1,21 +1,59 @@
 // Toolbar popup: edits stored settings and controls the active video call tab.
 (() => {
   const S = globalThis.__plexusSettings;
-  const SAVE_DELAY_MS = 200;
   const $ = (id) => document.getElementById(id);
 
   let settings = S ? S.sanitize({}) : {};
   let saveTimer = null;
 
-  // Debounced so dragging a slider or color picker doesn't hit storage quotas.
-  function save(next) {
+  async function activeTabId() {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      return tab?.id;
+    } catch (_) {
+      return undefined;
+    }
+  }
+
+  async function broadcast(msg) {
+    try {
+      const tabs = await chrome.tabs.query({});
+      for (const tab of tabs) {
+        if (!tab.id) continue;
+        chrome.tabs.sendMessage(tab.id, msg).catch(() => {});
+      }
+    } catch (_) {}
+  }
+
+  async function ask(type) {
+    try {
+      const id = await activeTabId();
+      if (id === undefined) return null;
+      return await chrome.tabs.sendMessage(id, { type });
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Saves immediately to sync and local storage, and broadcasts directly to video call tabs
+  function save(next, debounce = false) {
     if (!S) return;
     settings = S.sanitize(next);
     render();
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      chrome.storage.sync.set({ settings }).catch(() => {});
-    }, SAVE_DELAY_MS);
+
+    const doPersist = () => {
+      try { chrome.storage.sync.set({ settings }).catch(() => {}); } catch (_) {}
+      try { chrome.storage.local.set({ settings }).catch(() => {}); } catch (_) {}
+      broadcast({ type: 'plexus:settings', settings });
+    };
+
+    if (debounce) {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(doPersist, 80);
+    } else {
+      clearTimeout(saveTimer);
+      doPersist();
+    }
   }
 
   const withElement = (key, patch) => ({
@@ -40,7 +78,7 @@
         swatches.appendChild(dot);
       });
       chip.append(swatches, document.createTextNode(name));
-      chip.addEventListener('click', () => save(S.applyPreset(settings, name)));
+      chip.addEventListener('click', () => save(S.applyPreset(settings, name), false));
       wrap.appendChild(chip);
     });
   }
@@ -56,14 +94,14 @@
       const check = document.createElement('input');
       check.type = 'checkbox';
       check.id = `${key}On`;
-      check.addEventListener('change', () => save(withElement(key, { on: check.checked })));
+      check.addEventListener('change', () => save(withElement(key, { on: check.checked }), false));
       const name = document.createElement('span');
       name.textContent = S.LABELS[key];
       const color = document.createElement('input');
       color.type = 'color';
       color.id = `${key}Color`;
       color.setAttribute('aria-label', `${S.LABELS[key]} color`);
-      color.addEventListener('input', () => save(withElement(key, { color: color.value })));
+      color.addEventListener('input', () => save(withElement(key, { color: color.value }), false));
       row.append(check, name, color);
       li.appendChild(row);
       list.appendChild(li);
@@ -73,7 +111,7 @@
   function bindSlider(id, read, write) {
     const input = $(id);
     if (!input) return () => {};
-    input.addEventListener('input', () => save(write(Number(input.value))));
+    input.addEventListener('input', () => save(write(Number(input.value)), true));
     return () => {
       input.value = read();
       const out = $(`${id}Out`);
@@ -84,8 +122,8 @@
   function bindCheck(id, read, write) {
     const input = $(id);
     if (!input) return () => {};
-    input.addEventListener('change', () => save(write(input.checked)));
-    return () => { input.checked = !!read(); };
+    input.addEventListener('change', () => save(write(input.checked), false));
+    return () => { input.checked = Boolean(read()); };
   }
 
   const renderers = [
@@ -101,7 +139,7 @@
       (strength) => ({ ...settings, personLight: { ...settings.personLight, strength } })),
     bindCheck('clapSound', () => settings.clapSound, (clapSound) => ({ ...settings, clapSound })),
 
-    // Gestures
+    // Gestures & Anime FX
     bindCheck('gesturesOn', () => settings.gestures?.on,
       (on) => ({ ...settings, gestures: { ...settings.gestures, on } })),
     bindCheck('gestureChidori', () => settings.gestures?.chidori,
@@ -137,14 +175,14 @@
     (() => {
       const col = $('airDrawColor');
       if (col) {
-        col.addEventListener('input', () => save({ ...settings, airDraw: { ...settings.airDraw, color: col.value } }));
+        col.addEventListener('input', () => save({ ...settings, airDraw: { ...settings.airDraw, color: col.value } }, false));
       }
       return () => { if (col) col.value = settings.airDraw?.color || '#00ffff'; };
     })(),
     (() => {
       const sz = $('airDrawSize');
       if (sz) {
-        sz.addEventListener('input', () => save({ ...settings, airDraw: { ...settings.airDraw, size: Number(sz.value) } }));
+        sz.addEventListener('input', () => save({ ...settings, airDraw: { ...settings.airDraw, size: Number(sz.value) } }, true));
       }
       return () => {
         if (sz) {
@@ -169,7 +207,7 @@
       const el = settings.elements[key];
       const check = $(`${key}On`);
       const color = $(`${key}Color`);
-      if (check) check.checked = el.on;
+      if (check) check.checked = Boolean(el.on);
       if (color) color.value = el.color;
       if (check) {
         const row = check.closest('.row');
@@ -223,54 +261,87 @@
     const label = $('state');
     const button = $('toggle');
     if (!button || !label) return;
-    if (!state) {
-      label.textContent = 'Open any camera tab (Meet, Messenger, OmeTV...)';
-      label.classList.remove('on');
-      button.disabled = true;
-      return;
-    }
+
     button.disabled = false;
-    if (!state.engine) {
-      label.textContent = 'Waiting for your camera';
+
+    if (!state) {
+      label.textContent = 'Ready · Open camera in Meet, Messenger, OmeTV...';
       label.classList.remove('on');
+      button.textContent = '⚡ Turn On';
+      button.classList.remove('active');
       return;
     }
-    label.textContent = state.active ? 'Effect is ON' : `Effect is off · tracking ${state.tracking}`;
-    label.classList.toggle('on', state.active);
-    button.textContent = state.active ? 'Turn off' : 'Turn on';
-  }
 
-  async function activeTabId() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    return tab?.id;
-  }
-
-  async function ask(type) {
-    try {
-      const id = await activeTabId();
-      return id === undefined ? null : await chrome.tabs.sendMessage(id, { type });
-    } catch (error) {
-      return null;
+    if (state.active) {
+      label.textContent = `✨ Camera Plexus ACTIVE (${state.tracking || 'tracking'})`;
+      label.classList.add('on');
+      button.textContent = '⚡ Turn Off';
+      button.classList.add('active');
+    } else {
+      label.classList.remove('on');
+      button.textContent = '⚡ Turn On';
+      button.classList.remove('active');
+      if (state.engine) {
+        label.textContent = 'Camera ready · Click to activate';
+      } else {
+        label.textContent = 'Ready · Waiting for camera stream';
+      }
     }
   }
 
   const toggleBtn = $('toggle');
   if (toggleBtn) {
-    toggleBtn.addEventListener('click', async () => showState(await ask('plexus:toggle')));
+    toggleBtn.addEventListener('click', async () => {
+      toggleBtn.disabled = true;
+      try {
+        const id = await activeTabId();
+        let state = null;
+        if (id !== undefined) {
+          try {
+            state = await chrome.tabs.sendMessage(id, { type: 'plexus:toggle' });
+          } catch (_) {}
+        }
+        broadcast({ type: 'plexus:toggle' });
+        showState(state);
+      } finally {
+        toggleBtn.disabled = false;
+      }
+    });
   }
 
   const resetBtn = $('reset');
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
-      if (S) save(S.sanitize({}));
+      if (S) save(S.sanitize({}), false);
     });
   }
 
-  buildPresets();
-  buildElements();
-  chrome.storage.sync.get('settings').then(({ settings: stored }) => {
-    if (S) settings = S.sanitize(stored);
+  async function init() {
+    buildPresets();
+    buildElements();
+
+    let stored = null;
+    try {
+      const syncRes = await chrome.storage.sync.get('settings');
+      if (syncRes && syncRes.settings) stored = syncRes.settings;
+    } catch (_) {}
+    if (!stored) {
+      try {
+        const localRes = await chrome.storage.local.get('settings');
+        if (localRes && localRes.settings) stored = localRes.settings;
+      } catch (_) {}
+    }
+
+    if (S) settings = S.sanitize(stored || {});
     render();
-  });
-  ask('plexus:state').then(showState);
+
+    try {
+      const state = await ask('plexus:state');
+      showState(state);
+    } catch (_) {
+      showState(null);
+    }
+  }
+
+  init();
 })();

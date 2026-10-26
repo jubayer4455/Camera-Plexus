@@ -4,7 +4,8 @@
   "version": "2.0.0",
   "description": "Glowing plexus lines, gestures (peace, heart, thumbs up, mystic shield, energy ball), and air drawing for Google Meet, Messenger, OmeTV, and all camera video calls.",
   "icons": { "48": "icons/icon48.png", "128": "icons/icon128.png" },
-  "permissions": ["storage"],
+  "permissions": ["storage", "activeTab", "tabs"],
+  "host_permissions": ["<all_urls>"],
   "action": {
     "default_title": "Camera Plexus settings",
     "default_popup": "popup/popup.html",

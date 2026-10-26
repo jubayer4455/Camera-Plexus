@@ -11,15 +11,25 @@
 
   async function pushSettings() {
     try {
-      const { settings } = await chrome.storage.sync.get('settings');
+      let settings = null;
+      try {
+        const syncRes = await chrome.storage.sync.get('settings');
+        if (syncRes && syncRes.settings) settings = syncRes.settings;
+      } catch (_) {}
+      if (!settings) {
+        try {
+          const localRes = await chrome.storage.local.get('settings');
+          if (localRes && localRes.settings) settings = localRes.settings;
+        } catch (_) {}
+      }
       post('settings', { settings: settings || {} });
     } catch (error) {
       post('settings', { settings: {} });
     }
   }
 
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'sync' && changes.settings) post('settings', { settings: changes.settings.newValue || {} });
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.settings) post('settings', { settings: changes.settings.newValue || {} });
   });
 
   window.addEventListener('message', (event) => {
@@ -27,7 +37,8 @@
     const msg = event.data;
     if (msg.__plexus === 'hello') pushSettings();
     if (msg.__plexus === 'save-settings' && msg.settings) {
-      chrome.storage.sync.set({ settings: msg.settings }).catch(() => {});
+      try { chrome.storage.sync.set({ settings: msg.settings }).catch(() => {}); } catch (_) {}
+      try { chrome.storage.local.set({ settings: msg.settings }).catch(() => {}); } catch (_) {}
     }
     if (msg.__plexus === 'state') {
       state = { active: !!msg.active, engine: !!msg.engine, tracking: String(msg.tracking || '') };
@@ -37,11 +48,17 @@
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg?.type === 'plexus:toggle') {
       post('toggle');
-      setTimeout(() => sendResponse(state), 150);
+      setTimeout(() => sendResponse(state), 100);
+      return true;
+    }
+    if (msg?.type === 'plexus:settings') {
+      if (msg.settings) post('settings', { settings: msg.settings });
+      sendResponse({ ok: true, state });
       return true;
     }
     if (msg?.type === 'plexus:state') {
       sendResponse(state);
+      return true;
     }
     return false;
   });
