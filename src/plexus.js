@@ -334,8 +334,12 @@
     }
 
     function isIdle() {
-      const gActive = settings.gestures?.on || settings.airDraw?.on;
-      return level === 0 && target === 0 && particles.count() === 0 && (!gActive || rawDetected.length === 0);
+      const gActive = Boolean(
+        (settings.gestures?.on && (rawDetected.length > 0 || level > 0)) ||
+        settings.airDraw?.on ||
+        settings.targetGame?.on
+      );
+      return level === 0 && target === 0 && particles.count() === 0 && !gActive;
     }
 
     function lightSources() {

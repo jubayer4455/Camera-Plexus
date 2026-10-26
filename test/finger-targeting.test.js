@@ -245,3 +245,14 @@ test('Game Focus Mode isolates game and suppresses other FX', () => {
   assert.strictEqual(custom.gestures.laserSword, true);
   assert.strictEqual(custom.gestures.fingerGun, true);
 });
+
+test('gestures.js loads and initializes gesture manager without errors', () => {
+  globalThis.__plexusFx = globalThis.__plexusFx || {};
+  require('../src/settings.js');
+  require('../src/gestures.js');
+  assert.strictEqual(typeof globalThis.__plexusFx.createGestureManager, 'function');
+  const gm = globalThis.__plexusFx.createGestureManager();
+  assert.strictEqual(typeof gm.update, 'function');
+  assert.strictEqual(typeof gm.draw, 'function');
+  assert.strictEqual(typeof gm.getGameStats, 'function');
+});

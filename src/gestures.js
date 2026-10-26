@@ -564,8 +564,6 @@
       });
 
       // --- Finger Gun & Target Game Systems ---
-      const gameOn = Boolean(settings.targetGame?.on);
-
       // Reset combo if no target hit for > 3.2s
       if (now - lastHitTime > 3200 && gameCombo > 1) {
         gameCombo = 1;

@@ -66,6 +66,11 @@
     }
   }
   FX.toggle = toggleOrExplain;
+  FX.setActive = (on) => {
+    if (FX.engine) {
+      FX.engine.setActive(on);
+    }
+  };
 
   window.addEventListener(
     'keydown',

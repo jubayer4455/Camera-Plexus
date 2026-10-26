@@ -68,6 +68,35 @@
         color: #d1b8ff;
         font-weight: 600;
       }
+      .plexus-hud-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .plexus-hud-power-pill {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        color: #ddd;
+        padding: 3px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .plexus-hud-power-pill:hover {
+        background: rgba(255, 255, 255, 0.22);
+        color: #fff;
+      }
+      .plexus-hud-power-pill.active {
+        background: linear-gradient(135deg, #00f0ff, #0077ff);
+        border-color: #33ccff;
+        color: #fff;
+        box-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+      }
       .plexus-hud-min-btn {
         background: none;
         border: none;
@@ -307,9 +336,14 @@
 
   function saveSettings(patch) {
     const S = getSettingsModule();
-    if (!FX.settings || !S) return;
-    const next = S.sanitize({ ...FX.settings, ...patch });
-    FX.settings = next;
+    if (!FX.settings) {
+      FX.settings = S ? S.sanitize(patch) : patch;
+    } else if (S) {
+      FX.settings = S.sanitize({ ...FX.settings, ...patch });
+    } else {
+      FX.settings = { ...FX.settings, ...patch };
+    }
+    const next = FX.settings;
     window.postMessage({ __plexus: 'save-settings', settings: next }, '*');
     window.postMessage({ __plexus: 'settings', settings: next }, '*');
   }
@@ -331,9 +365,13 @@
         <div class="plexus-hud-header" id="plexus-hud-drag">
           <div class="plexus-hud-title">
             <span>✨ Camera Plexus</span>
-            <span class="plexus-hud-badge" id="plexus-hud-status">Ready</span>
           </div>
-          <button class="plexus-hud-min-btn" id="plexus-hud-close" title="Minimize">−</button>
+          <div class="plexus-hud-header-actions">
+            <button class="plexus-hud-power-pill" id="plexus-header-power" title="Master Power: Click to turn effect On or Off">
+              <span>⚡ ON</span>
+            </button>
+            <button class="plexus-hud-min-btn" id="plexus-hud-close" title="Minimize">−</button>
+          </div>
         </div>
 
         <div class="plexus-hud-tabs">
@@ -533,6 +571,18 @@
       setTimeout(() => { el.style.transform = ''; }, 120);
     }
 
+    // Header power toggle button (top corner)
+    const headerPowerBtn = container.querySelector('#plexus-header-power');
+    if (headerPowerBtn) {
+      headerPowerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        pressEffect(headerPowerBtn);
+        FX.toggle?.();
+        setTimeout(updateHUD, 40);
+        setTimeout(updateHUD, 180);
+      });
+    }
+
     // Tabs switching
     const tabs = container.querySelectorAll('.plexus-hud-tab');
     tabs.forEach((tab) => {
@@ -553,6 +603,7 @@
         pressEffect(masterFxBtn);
         const cur = !!FX.settings?.gestures?.on;
         saveSettings({ gestures: { ...(FX.settings?.gestures || {}), on: !cur } });
+        if (!cur) FX.setActive?.(true);
         FX.showStatus?.(cur ? 'FX & Gestures OFF' : 'FX & Gestures ON', 'ok');
         updateHUD();
       });
@@ -571,7 +622,12 @@
           patch.thumbsUp = !cur;
           patch.heart = !cur;
         }
-        saveSettings({ gestures: { ...g, ...patch } });
+        if (!cur) {
+          saveSettings({ gestures: { ...g, on: true, ...patch } });
+          FX.setActive?.(true);
+        } else {
+          saveSettings({ gestures: { ...g, ...patch } });
+        }
         FX.showStatus?.(`${label}: ${!cur ? 'ON' : 'OFF'}`, 'info');
         updateHUD();
       });
@@ -599,6 +655,7 @@
             nodes: { ...els.nodes, on: !cur },
           },
         });
+        if (!cur) FX.setActive?.(true);
         FX.showStatus?.(`Plexus Mesh: ${!cur ? 'ON' : 'OFF'}`, 'info');
         updateHUD();
       });
@@ -611,6 +668,7 @@
         pressEffect(gameToggleBtn);
         const cur = !!FX.settings?.targetGame?.on;
         saveSettings({ targetGame: { ...(FX.settings?.targetGame || {}), on: !cur } });
+        if (!cur) FX.setActive?.(true);
         FX.showStatus?.(cur ? 'Target Game OFF' : '🎯 Target Game ON: Use 👉 finger gun to pop balloons!', 'ok');
         updateHUD();
       });
@@ -657,6 +715,7 @@
         pressEffect(drawToggleBtn);
         const cur = !!FX.settings?.airDraw?.on;
         saveSettings({ airDraw: { ...(FX.settings?.airDraw || {}), on: !cur } });
+        if (!cur) FX.setActive?.(true);
         FX.showStatus?.(cur ? 'Air Draw OFF' : 'Air Draw ON: Point or pinch fingertip in air', 'ok');
         updateHUD();
       });
@@ -777,6 +836,14 @@
         statusBadge.style.background = 'rgba(168, 120, 255, 0.25)';
         statusBadge.style.color = '#d1b8ff';
       }
+    }
+
+    // Header power toggle button (top corner)
+    const headerPower = container.querySelector('#plexus-header-power');
+    if (headerPower) {
+      headerPower.classList.toggle('active', active);
+      const span = headerPower.querySelector('span');
+      if (span) span.textContent = active ? '⚡ ON' : '⚡ OFF';
     }
 
     // 1. Tab FX button states
