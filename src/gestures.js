@@ -24,6 +24,8 @@
 
     // Active continuous gesture states (for smooth fade in/out)
     let shieldAlpha = { left: 0, right: 0 };
+    let shieldPositions = { left: { x: 0, y: 0 }, right: { x: 0, y: 0 } };
+    let shieldRadii = { left: 60, right: 60 };
     let energyBallAlpha = 0;
     let energyCenter = { x: 0, y: 0 };
     let energyRadius = 40;
@@ -31,6 +33,7 @@
     // Anime & Superhero continuous states
     let chidoriAlpha = { left: 0, right: 0 };
     let chidoriPositions = { left: { x: 0, y: 0 }, right: { x: 0, y: 0 } };
+    let chidoriRadii = { left: 50, right: 50 };
     let superSaiyanAlpha = 0;
     let laserSwordAlpha = { left: 0, right: 0 };
     let laserSwordAngles = { left: 0, right: 0 };
@@ -50,7 +53,10 @@
     let scorePopups = []; // { x, y, text, alpha, life, vy, color }
     let muzzleFlashes = []; // { x, y, radius, alpha, color }
     let gunStates = { left: 'idle', right: 'idle' };
+    let gunActive = { left: false, right: false };
     let gunAngles = { left: 0, right: 0 };
+    let gunTipPositions = { left: { x: 0, y: 0 }, right: { x: 0, y: 0 } };
+    let lastGunFireAt = { left: 0, right: 0 };
     let lastBalloonSpawnAt = 0;
 
     // Trigger cooldowns to prevent spamming single-shot bursts
@@ -104,55 +110,59 @@
       const hSize = dist(wrist, middleMcp);
       if (hSize < 0.001) return null;
 
-      // Finger extended: tip is further from wrist than PIP
-      const indexExt = dist(indexTip, wrist) > dist(indexPip, wrist) * 1.15;
-      const middleExt = dist(middleTip, wrist) > dist(middlePip, wrist) * 1.15;
-      const ringExt = dist(ringTip, wrist) > dist(ringPip, wrist) * 1.15;
-      const pinkyExt = dist(pinkyTip, wrist) > dist(pinkyPip, wrist) * 1.15;
+      // Finger extended: tip is further from wrist than PIP (unified threshold eliminates dead zone)
+      const indexExt = dist(indexTip, wrist) > dist(indexPip, wrist) * 1.12;
+      const middleExt = dist(middleTip, wrist) > dist(middlePip, wrist) * 1.12;
+      const ringExt = dist(ringTip, wrist) > dist(ringPip, wrist) * 1.12;
+      const pinkyExt = dist(pinkyTip, wrist) > dist(pinkyPip, wrist) * 1.12;
 
-      // Finger curled: tip is close to MCP/wrist
-      const ringCurled = dist(ringTip, wrist) < dist(ringPip, wrist) * 1.05;
-      const pinkyCurled = dist(pinkyTip, wrist) < dist(pinkyPip, wrist) * 1.05;
-      const indexCurled = dist(indexTip, wrist) < dist(indexPip, wrist) * 1.05;
-      const middleCurled = dist(middleTip, wrist) < dist(middlePip, wrist) * 1.05;
-      const thumbCurled = dist(thumbTip, middleMcp) < 0.52 * hSize;
+      // Finger curled: not extended
+      const ringCurled = !ringExt;
+      const pinkyCurled = !pinkyExt;
+      const indexCurled = !indexExt;
+      const middleCurled = !middleExt;
+      const thumbCurled = dist(thumbTip, middleMcp) < 0.65 * hSize;
       const thumbExt = !thumbCurled;
 
       const tipGap = dist(indexTip, middleTip);
+      const swordGapMax = Math.max(0.042 * aspect, 0.44 * hSize);
 
       // Peace: Index + Middle extended, Ring + Pinky curled, gap between tips is wide
       const isPeace = indexExt && middleExt && ringCurled && pinkyCurled &&
-        tipGap > 0.038 * aspect;
+        tipGap > swordGapMax;
 
-      // Laser Sword (Lightsaber): Index + Middle extended together (tight gap <= 0.038 * aspect)
+      // Laser Sword (Lightsaber): Index + Middle extended together
       const isSword = indexExt && middleExt && ringCurled && pinkyCurled &&
-        tipGap <= 0.038 * aspect;
-
-      // Chidori (Naruto Lightning Fist): All fingers + thumb curled tightly
-      const isFist = indexCurled && middleCurled && ringCurled && pinkyCurled && thumbCurled;
-
-      // Spider-Man (🤟): Thumb, Index, Pinky extended; Middle and Ring curled
-      const isSpiderMan = thumbExt && indexExt && middleCurled && ringCurled && pinkyExt;
+        tipGap <= swordGapMax;
 
       // Thumbs Up: Thumb pointing up (tip y significantly lower than wrist y), others curled
-      const thumbUp = (wrist.y - thumbTip.y) > 0.45 * hSize && (indexMcp.y - thumbTip.y) > 0.25 * hSize;
+      const thumbUp = (wrist.y - thumbTip.y) > 0.42 * hSize &&
+        (indexMcp.y - thumbTip.y) > 0.22 * hSize &&
+        dist(thumbTip, indexMcp) > 0.45 * hSize;
       const isThumbsUp = thumbUp && indexCurled && middleCurled && ringCurled && pinkyCurled;
+
+      // Chidori (Naruto Lightning Fist): All 4 fingers curled and not thumbs-up
+      const isFist = indexCurled && middleCurled && ringCurled && pinkyCurled && !isThumbsUp;
+
+      // Spider-Man (🤟): Index and Pinky extended; Middle and Ring curled
+      const isSpiderMan = indexExt && pinkyExt && middleCurled && ringCurled;
 
       // Open Palm: All 4 fingers + thumb extended outward
       const isOpenPalm = indexExt && middleExt && ringExt && pinkyExt &&
-        dist(thumbTip, pinkyTip) > 0.8 * hSize;
+        dist(thumbTip, pinkyTip) > 0.72 * hSize;
 
       // Pinch: Thumb tip very close to Index tip
-      const isPinch = dist(thumbTip, indexTip) < 0.22 * hSize;
+      const isPinch = dist(thumbTip, indexTip) < 0.24 * hSize;
 
       // Pointing (Air draw trigger): Index extended, Middle/Ring/Pinky curled
       const isPoint = indexExt && middleCurled && ringCurled && pinkyCurled;
 
       // 🔫 Finger Gun (Index extended, Middle/Ring/Pinky curled)
       const isGunShape = indexExt && middleCurled && ringCurled && pinkyCurled;
+      const thumbDistRatio = dist(thumbTip, indexMcp) / hSize;
       // Thumb UP (cocked hammer) vs Thumb DOWN (trigger pull)
-      const thumbCocked = isGunShape && ((wrist.y - thumbTip.y > 0.30 * hSize) || (dist(thumbTip, indexMcp) > 0.40 * hSize));
-      const thumbPulled = isGunShape && (dist(thumbTip, indexMcp) < 0.32 * hSize || thumbTip.y >= indexMcp.y - 0.08 * hSize);
+      const thumbCocked = isGunShape && (thumbDistRatio >= 0.38 || (wrist.y - thumbTip.y > 0.34 * hSize && thumbTip.y < indexMcp.y - 0.06 * hSize));
+      const thumbPulled = isGunShape && !thumbCocked;
       const barrelAngle = Math.atan2(indexTip.y - indexMcp.y, indexTip.x - indexMcp.x);
 
       // Direction vector for laser sword blade
@@ -329,6 +339,13 @@
       // 1. Analyze single hands
       const analyses = detectedHands.map((h) => analyzeHand(h, aspect)).filter(Boolean);
 
+      if (analyses.length === 0) {
+        gunStates.left = 'idle';
+        gunStates.right = 'idle';
+        gunActive.left = false;
+        gunActive.right = false;
+        currentStroke = null;
+      }
       if (analyses.length === 0 || !fxAllowed) {
         chidoriAlpha.left = lerp(chidoriAlpha.left, 0, 0.25);
         chidoriAlpha.right = lerp(chidoriAlpha.right, 0, 0.25);
@@ -345,46 +362,50 @@
         const px = a.indexTip.x * w;
         const py = a.indexTip.y * h;
         const sideKey = idx === 0 ? 'left' : 'right';
+        const handPixelSize = (a.hSize / Math.max(0.5, aspect)) * Math.min(w, h);
 
         // Peace sign
-        if (partyAllowed && gConfig.peace && a.isPeace && now - lastPeaceAt > BURST_COOLDOWN_MS) {
+        if (partyAllowed && gConfig.peace !== false && a.isPeace && now - lastPeaceAt > BURST_COOLDOWN_MS) {
           lastPeaceAt = now;
           spawnConfetti({ x: px, y: py });
         }
 
         // Thumbs Up
-        if (partyAllowed && gConfig.thumbsUp && a.isThumbsUp && now - lastThumbAt > BURST_COOLDOWN_MS) {
+        if (partyAllowed && gConfig.thumbsUp !== false && a.isThumbsUp && now - lastThumbAt > BURST_COOLDOWN_MS) {
           lastThumbAt = now;
           spawnFireworks({ x: a.thumbTip.x * w, y: a.thumbTip.y * h });
         }
 
         // Mystic shield on open palm
-        const wantShield = fxAllowed && gConfig.mysticShield && a.isOpenPalm;
-        shieldAlpha[sideKey] = lerp(shieldAlpha[sideKey], wantShield ? 1 : 0, 0.15);
+        const wantShield = fxAllowed && gConfig.mysticShield !== false && a.isOpenPalm;
+        shieldAlpha[sideKey] = lerp(shieldAlpha[sideKey], wantShield ? 1 : 0, 0.18);
+        shieldPositions[sideKey] = { x: a.palm.x * w, y: a.palm.y * h };
+        shieldRadii[sideKey] = Math.max(50, handPixelSize * 1.35);
 
         // ⚡ Chidori (Naruto Lightning Fist)
-        const wantChidori = fxAllowed && gConfig.chidori && a.isFist;
-        chidoriAlpha[sideKey] = lerp(chidoriAlpha[sideKey], wantChidori ? 1 : 0, 0.2);
+        const wantChidori = fxAllowed && gConfig.chidori !== false && a.isFist;
+        chidoriAlpha[sideKey] = lerp(chidoriAlpha[sideKey], wantChidori ? 1 : 0, 0.22);
         chidoriPositions[sideKey] = { x: a.palm.x * w, y: a.palm.y * h };
+        chidoriRadii[sideKey] = Math.max(45, handPixelSize * 0.95);
         if (wantChidori && now - lastChidoriSoundAt > 1400) {
           lastChidoriSoundAt = now;
           FX.playSound?.('chidori');
         }
 
         // 🕸️ Spider-Man Web Shoot (🤟)
-        if (fxAllowed && gConfig.spiderWeb && a.isSpiderMan && now - lastWebShootAt > 850) {
+        if (fxAllowed && gConfig.spiderWeb !== false && a.isSpiderMan && now - lastWebShootAt > 850) {
           lastWebShootAt = now;
           spawnSpiderWeb({ x: a.palm.x * w, y: a.palm.y * h }, w, h);
           FX.playSound?.('web');
         }
 
         // ⚔️ Laser Sword / Lightsaber
-        const wantSword = fxAllowed && gConfig.laserSword && a.isSword;
-        laserSwordAlpha[sideKey] = lerp(laserSwordAlpha[sideKey], wantSword ? 1 : 0, 0.2);
+        const wantSword = fxAllowed && gConfig.laserSword !== false && a.isSword;
+        laserSwordAlpha[sideKey] = lerp(laserSwordAlpha[sideKey], wantSword ? 1 : 0, 0.22);
         if (wantSword) {
           laserSwordAngles[sideKey] = a.swordAngle;
           laserSwordPositions[sideKey] = {
-            x: a.swordMidTip.x * w,
+            x: (a.swordMidTip.x / aspect) * w,
             y: a.swordMidTip.y * h,
           };
           if (now - lastSaberSoundAt > 1800) {
@@ -395,12 +416,32 @@
 
         // 🔫 Finger Gun (shooting laser bullets)
         if (gunAllowed && a.isGunShape) {
+          gunActive[sideKey] = true;
           gunAngles[sideKey] = a.barrelAngle;
-          if (a.thumbCocked && gunStates[sideKey] !== 'cocked') {
-            gunStates[sideKey] = 'cocked';
-          } else if (a.thumbPulled && gunStates[sideKey] === 'cocked') {
-            gunStates[sideKey] = 'fired';
-            const ang = a.barrelAngle;
+          gunTipPositions[sideKey] = { x: px, y: py };
+
+          const fireBullet = () => {
+            lastGunFireAt[sideKey] = now;
+            let ang = a.barrelAngle;
+            // In Target Game mode, gently assist aim toward nearest balloon within cone
+            if (gameOn && balloons.length > 0) {
+              let bestB = null;
+              let bestDist = Infinity;
+              balloons.forEach((b) => {
+                const d = dist({ x: px, y: py }, { x: b.x + (b.wobble || 0), y: b.y });
+                if (d < bestDist) {
+                  bestDist = d;
+                  bestB = b;
+                }
+              });
+              if (bestB && bestDist < Math.max(w, h) * 0.55) {
+                const targetAng = Math.atan2(bestB.y - py, (bestB.x + (bestB.wobble || 0)) - px);
+                const diff = Math.atan2(Math.sin(targetAng - ang), Math.cos(targetAng - ang));
+                if (Math.abs(diff) < 0.85) {
+                  ang = targetAng;
+                }
+              }
+            }
             const spd = 1650;
             bullets.push({
               x: px,
@@ -419,9 +460,20 @@
               color: '#00ffff',
             });
             FX.playSound?.('laserGun');
+          };
+
+          if (a.thumbCocked && gunStates[sideKey] !== 'cocked') {
+            gunStates[sideKey] = 'cocked';
+          } else if (a.thumbPulled && gunStates[sideKey] === 'cocked' && now - lastGunFireAt[sideKey] > 240) {
+            gunStates[sideKey] = 'fired';
+            fireBullet();
+          } else if (gameOn && now - lastGunFireAt[sideKey] > 550) {
+            // Auto-pulse laser in Target Game while holding Finger Gun pose
+            fireBullet();
           }
         } else {
           gunStates[sideKey] = 'idle';
+          gunActive[sideKey] = false;
         }
 
         // Air Drawing (isolated during gameFocus)
@@ -477,16 +529,16 @@
         const indexDist = dist(i1, i2);
         const thumbDist = dist(t1, t2);
 
-        if (partyAllowed && gConfig.heart && indexDist < 0.45 * avgSize && thumbDist < 0.45 * avgSize &&
+        if (partyAllowed && gConfig.heart !== false && indexDist < 0.45 * avgSize && thumbDist < 0.45 * avgSize &&
             now - lastHeartAt > BURST_COOLDOWN_MS) {
           lastHeartAt = now;
           spawnHearts({ x: (i1.x + i2.x) / 2, y: (i1.y + i2.y) / 2 }, 6);
         }
 
         // Energy / Plasma Ball (two hands facing each other)
-        const wantBall = fxAllowed && gConfig.energyBall &&
-          palmDist > 0.6 * avgSize && palmDist < 2.4 * avgSize;
-        energyBallAlpha = lerp(energyBallAlpha, wantBall ? 1 : 0, 0.12);
+        const wantBall = fxAllowed && gConfig.energyBall !== false &&
+          palmDist > 0.55 * avgSize && palmDist < 2.6 * avgSize;
+        energyBallAlpha = lerp(energyBallAlpha, wantBall ? 1 : 0, 0.14);
         energyCenter = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
         energyRadius = Math.max(30, palmDist * 0.32);
 
@@ -506,19 +558,23 @@
           });
         }
 
-        // 🔥 Super Saiyan Aura (Dragon Ball Z power-up pose: hands spread wide apart)
+        // 🔥 Super Saiyan Aura (Dragon Ball Z power-up pose: hands spread apart)
         const rawHandSpan = Math.abs(h1.wrist.x - h2.wrist.x) / aspect;
-        const isSpread = rawHandSpan > 0.38;
-        const isChestHeight = h1.wrist.y > 0.20 && h1.wrist.y < 0.92 && h2.wrist.y > 0.20 && h2.wrist.y < 0.92;
-        const wantSaiyan = fxAllowed && gConfig.superSaiyan && isSpread && isChestHeight;
-        superSaiyanAlpha = lerp(superSaiyanAlpha, wantSaiyan ? 1 : 0, 0.14);
+        const isSpread = rawHandSpan > 0.28;
+        const isChestHeight = h1.wrist.y > 0.10 && h1.wrist.y < 0.98 && h2.wrist.y > 0.10 && h2.wrist.y < 0.98;
+        const wantSaiyan = fxAllowed && gConfig.superSaiyan !== false && isSpread && isChestHeight;
+        superSaiyanAlpha = lerp(superSaiyanAlpha, wantSaiyan ? 1 : 0, 0.16);
         if (wantSaiyan && now - lastSaiyanSoundAt > 2800) {
           lastSaiyanSoundAt = now;
           FX.playSound?.('superSaiyan');
         }
       } else {
         energyBallAlpha = lerp(energyBallAlpha, 0, 0.2);
-        shieldAlpha.right = 0;
+        shieldAlpha.right = lerp(shieldAlpha.right, 0, 0.25);
+        chidoriAlpha.right = lerp(chidoriAlpha.right, 0, 0.25);
+        laserSwordAlpha.right = lerp(laserSwordAlpha.right, 0, 0.25);
+        gunStates.right = 'idle';
+        gunActive.right = false;
         superSaiyanAlpha = lerp(superSaiyanAlpha, 0, 0.2);
       }
 
@@ -574,9 +630,26 @@
         const speedMul = (settings.targetGame?.speed === 'fast') ? 1.45 : 1.0;
         const maxBalloons = FX.isMobile ? 3 : 5;
         const spawnInterval = (FX.isMobile ? 2200 : 1600) / speedMul;
-        if (balloons.length < maxBalloons && now - lastBalloonSpawnAt > spawnInterval) {
+        const colors = ['#00ffff', '#ff007f', '#ffff00', '#00ff66', '#a878ff', '#ff8800'];
+        if (balloons.length === 0) {
+          // Immediately populate screen when game starts so user sees targets right away
+          const initialCount = FX.isMobile ? 2 : 3;
+          for (let i = 0; i < initialCount; i += 1) {
+            const col = colors[(i + Math.floor(Math.random() * colors.length)) % colors.length];
+            balloons.push({
+              id: Math.random(),
+              x: w * (0.2 + (i * 0.28) + (Math.random() - 0.5) * 0.1),
+              y: h * (0.45 + Math.random() * 0.35),
+              vx: (Math.random() - 0.5) * 45 * speedMul,
+              vy: (-75 - Math.random() * 65) * speedMul,
+              radius: (26 + Math.random() * 10) * (Math.min(w, h) / 720),
+              color: col,
+              seed: Math.random() * 100,
+            });
+          }
           lastBalloonSpawnAt = now;
-          const colors = ['#00ffff', '#ff007f', '#ffff00', '#00ff66', '#a878ff', '#ff8800'];
+        } else if (balloons.length < maxBalloons && now - lastBalloonSpawnAt > spawnInterval) {
+          lastBalloonSpawnAt = now;
           const col = colors[Math.floor(Math.random() * colors.length)];
           balloons.push({
             id: Math.random(),
@@ -1238,7 +1311,7 @@
       ctx.moveTo(-r - 6 * unit, 0); ctx.lineTo(-r + 4 * unit, 0);
       ctx.moveTo(r - 4 * unit, 0); ctx.lineTo(r + 6 * unit, 0);
       ctx.moveTo(0, -r - 6 * unit); ctx.lineTo(0, -r + 4 * unit);
-      ctx.moveTo(0, -r + 4 * unit); ctx.lineTo(0, r + 6 * unit);
+      ctx.moveTo(0, r - 4 * unit); ctx.lineTo(0, r + 6 * unit);
       ctx.stroke();
 
       // Center dot
@@ -1289,7 +1362,11 @@
       ctx.shadowBlur = FX.isMobile ? 0 : 12 * unit;
 
       ctx.beginPath();
-      ctx.roundRect(bx, by, badgeW, badgeH, 12 * unit);
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(bx, by, badgeW, badgeH, 12 * unit);
+      } else {
+        ctx.rect(bx, by, badgeW, badgeH);
+      }
       ctx.fill();
       ctx.stroke();
 
@@ -1356,18 +1433,16 @@
       }
 
       // 2. Doctor Strange Mystic Shields on palms
-      if (smoothedHands && smoothedHands.length) {
-        smoothedHands.forEach((hd, i) => {
-          const sideKey = i === 0 ? 'left' : 'right';
-          const a = shieldAlpha[sideKey];
-          if (a > 0.01) {
-            const cx = hd.palm.x * w;
-            const cy = hd.palm.y * h;
-            const r = Math.max(50, hd.size * Math.min(w, h) * 1.35);
-            drawMysticMandala(ctx, cx, cy, r, a, now);
-          }
-        });
-      }
+      ['left', 'right'].forEach((sideKey, i) => {
+        const a = shieldAlpha[sideKey];
+        if (a > 0.01) {
+          const hd = smoothedHands && smoothedHands[i];
+          const cx = hd ? hd.palm.x * w : shieldPositions[sideKey].x;
+          const cy = hd ? hd.palm.y * h : shieldPositions[sideKey].y;
+          const r = hd ? Math.max(50, hd.size * Math.min(w, h) * 1.35) : shieldRadii[sideKey];
+          drawMysticMandala(ctx, cx, cy, r, a, now);
+        }
+      });
 
       // 3. Energy / Plasma Ball (Rasengan)
       if (energyBallAlpha > 0.01) {
@@ -1375,18 +1450,16 @@
       }
 
       // 4. ⚡ Chidori (Naruto Lightning Fist)
-      if (smoothedHands && smoothedHands.length) {
-        smoothedHands.forEach((hd, i) => {
-          const sideKey = i === 0 ? 'left' : 'right';
-          const ca = chidoriAlpha[sideKey];
-          if (ca > 0.01) {
-            const cx = hd.palm.x * w;
-            const cy = hd.palm.y * h;
-            const r = Math.max(45, hd.size * Math.min(w, h) * 0.95);
-            drawChidori(ctx, cx, cy, r, ca, now);
-          }
-        });
-      }
+      ['left', 'right'].forEach((sideKey, i) => {
+        const ca = chidoriAlpha[sideKey];
+        if (ca > 0.01) {
+          const hd = smoothedHands && smoothedHands[i];
+          const cx = hd ? hd.palm.x * w : chidoriPositions[sideKey].x;
+          const cy = hd ? hd.palm.y * h : chidoriPositions[sideKey].y;
+          const r = hd ? Math.max(45, hd.size * Math.min(w, h) * 0.95) : chidoriRadii[sideKey];
+          drawChidori(ctx, cx, cy, r, ca, now);
+        }
+      });
 
       // 5. ⚔️ Laser Sword / Lightsaber
       ['left', 'right'].forEach((sideKey) => {
@@ -1447,16 +1520,16 @@
       }
 
       // 10. 🎯 Finger Gun Aiming Crosshair
-      if (smoothedHands && smoothedHands.length) {
-        smoothedHands.forEach((hd, i) => {
-          const sideKey = i === 0 ? 'left' : 'right';
-          if (gunStates[sideKey] === 'cocked') {
-            const tip = hd.tips && hd.tips[1] ? { x: hd.tips[1].x * w, y: hd.tips[1].y * h } : { x: hd.palm.x * w, y: hd.palm.y * h };
-            const ang = gunAngles[sideKey] || 0;
-            drawAimSight(ctx, tip, ang, w, h, unit);
-          }
-        });
-      }
+      ['left', 'right'].forEach((sideKey, i) => {
+        if (gunActive[sideKey]) {
+          const hd = smoothedHands && smoothedHands[i];
+          const tip = (hd && hd.tips && hd.tips[1])
+            ? { x: hd.tips[1].x * w, y: hd.tips[1].y * h }
+            : gunTipPositions[sideKey];
+          const ang = gunAngles[sideKey] || 0;
+          drawAimSight(ctx, tip, ang, w, h, unit);
+        }
+      });
 
       // 11. Floating Score Popups
       if (scorePopups.length) {
@@ -1544,4 +1617,5 @@
   FX.getGameStats = () => FX.activeGestures?.getGameStats?.() || { score: 0, combo: 1, hits: 0 };
   FX.resetGame = () => FX.activeGestures?.resetGame?.();
   FX.createGestureManager = createGestureManager;
+  if (typeof module !== 'undefined') module.exports = { createGestureManager };
 })();

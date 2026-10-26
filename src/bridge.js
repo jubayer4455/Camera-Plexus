@@ -4,10 +4,13 @@
 // injects each file only once per page, so settings.js must stay listed only in
 // the page-world group, not here.)
 (() => {
-  document.documentElement.dataset.plexusBase = chrome.runtime.getURL('');
+  const baseUrl = chrome.runtime.getURL('');
+  if (document.documentElement) {
+    document.documentElement.dataset.plexusBase = baseUrl;
+  }
 
-  let state = { active: false, engine: false, tracking: 'not started' };
-  const post = (type, extra = {}) => window.postMessage({ __plexus: type, ...extra }, '*');
+  let state = { active: true, engine: false, tracking: 'ready' };
+  const post = (type, extra = {}) => window.postMessage({ __plexus: type, baseUrl, ...extra }, '*');
 
   async function pushSettings() {
     try {
@@ -22,14 +25,23 @@
           if (localRes && localRes.settings) settings = localRes.settings;
         } catch (_) {}
       }
-      post('settings', { settings: settings || {} });
+      if (settings) {
+        if (typeof settings.enabled === 'boolean') state.active = settings.enabled;
+        post('settings', { settings });
+      } else {
+        post('base', { baseUrl });
+      }
     } catch (error) {
-      post('settings', { settings: {} });
+      post('base', { baseUrl });
     }
   }
 
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings) post('settings', { settings: changes.settings.newValue || {} });
+    if (changes.settings && changes.settings.newValue) {
+      const next = changes.settings.newValue;
+      if (typeof next.enabled === 'boolean') state.active = next.enabled;
+      post('settings', { settings: next });
+    }
   });
 
   window.addEventListener('message', (event) => {
@@ -37,6 +49,7 @@
     const msg = event.data;
     if (msg.__plexus === 'hello') pushSettings();
     if (msg.__plexus === 'save-settings' && msg.settings) {
+      if (typeof msg.settings.enabled === 'boolean') state.active = msg.settings.enabled;
       try { chrome.storage.sync.set({ settings: msg.settings }).catch(() => {}); } catch (_) {}
       try { chrome.storage.local.set({ settings: msg.settings }).catch(() => {}); } catch (_) {}
     }
@@ -48,11 +61,20 @@
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg?.type === 'plexus:toggle') {
       post('toggle');
-      setTimeout(() => sendResponse(state), 100);
+      setTimeout(() => sendResponse(state), 80);
+      return true;
+    }
+    if (msg?.type === 'plexus:set-active') {
+      state.active = Boolean(msg.active);
+      post('set-active', { active: state.active });
+      setTimeout(() => sendResponse(state), 80);
       return true;
     }
     if (msg?.type === 'plexus:settings') {
-      if (msg.settings) post('settings', { settings: msg.settings });
+      if (msg.settings) {
+        if (typeof msg.settings.enabled === 'boolean') state.active = msg.settings.enabled;
+        post('settings', { settings: msg.settings });
+      }
       sendResponse({ ok: true, state });
       return true;
     }

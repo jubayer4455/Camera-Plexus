@@ -541,13 +541,20 @@
       container.style.top = `${Math.max(10, Math.min(maxT, initialTop + dy))}px`;
     }
 
+    // Isolate HUD events so host-page global listeners (Google Meet, Messenger, etc.) cannot swallow clicks
+    ['click', 'mousedown', 'pointerdown', 'touchstart'].forEach((evt) => {
+      container.addEventListener(evt, (e) => e.stopPropagation());
+    });
+
     const dragHandle = container.querySelector('#plexus-hud-drag');
     if (dragHandle) {
       dragHandle.addEventListener('mousedown', (e) => {
+        if (e.target && e.target.closest && e.target.closest('button, select, input, .plexus-swatch')) return;
         startDrag(e.clientX, e.clientY);
         e.preventDefault();
       });
       dragHandle.addEventListener('touchstart', (e) => {
+        if (e.target && e.target.closest && e.target.closest('button, select, input, .plexus-swatch')) return;
         if (e.touches[0]) startDrag(e.touches[0].clientX, e.touches[0].clientY);
       }, { passive: true });
     }
@@ -571,15 +578,22 @@
       setTimeout(() => { el.style.transform = ''; }, 120);
     }
 
+    function toggleMasterPower() {
+      const cur = FX.engine ? FX.engine.isActive() : (FX.settings?.enabled !== false);
+      const next = !cur;
+      saveSettings({ enabled: next });
+      if (FX.setActive) FX.setActive(next);
+      updateHUD();
+      setTimeout(updateHUD, 60);
+    }
+
     // Header power toggle button (top corner)
     const headerPowerBtn = container.querySelector('#plexus-header-power');
     if (headerPowerBtn) {
       headerPowerBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         pressEffect(headerPowerBtn);
-        FX.toggle?.();
-        setTimeout(updateHUD, 40);
-        setTimeout(updateHUD, 180);
+        toggleMasterPower();
       });
     }
 
@@ -602,9 +616,19 @@
       masterFxBtn.addEventListener('click', () => {
         pressEffect(masterFxBtn);
         const cur = !!FX.settings?.gestures?.on;
-        saveSettings({ gestures: { ...(FX.settings?.gestures || {}), on: !cur } });
-        if (!cur) FX.setActive?.(true);
-        FX.showStatus?.(cur ? 'FX & Gestures OFF' : 'FX & Gestures ON', 'ok');
+        const nextOn = !cur;
+        const patch = {
+          gestures: { ...(FX.settings?.gestures || {}), on: nextOn },
+        };
+        if (nextOn) {
+          patch.enabled = true;
+          if (FX.settings?.targetGame?.on && FX.settings?.targetGame?.focusMode !== false) {
+            patch.targetGame = { ...FX.settings.targetGame, on: false };
+          }
+        }
+        saveSettings(patch);
+        if (nextOn) FX.setActive?.(true);
+        FX.showStatus?.(nextOn ? 'FX & Gestures ON' : 'FX & Gestures OFF', 'ok');
         updateHUD();
       });
     }
@@ -615,20 +639,29 @@
       btn.addEventListener('click', () => {
         pressEffect(btn);
         const g = FX.settings?.gestures || {};
-        const cur = g[key] !== false;
-        const patch = { [key]: !cur };
+        const masterOn = g.on !== false;
+        const cur = masterOn && (g[key] !== false);
+        const nextVal = !cur;
+        const patch = { [key]: nextVal };
         if (key === 'party') {
-          patch.peace = !cur;
-          patch.thumbsUp = !cur;
-          patch.heart = !cur;
+          patch.peace = nextVal;
+          patch.thumbsUp = nextVal;
+          patch.heart = nextVal;
         }
-        if (!cur) {
-          saveSettings({ gestures: { ...g, on: true, ...patch } });
+        if (nextVal) {
+          const settingsPatch = {
+            enabled: true,
+            gestures: { ...g, on: true, ...patch },
+          };
+          if (FX.settings?.targetGame?.on && FX.settings?.targetGame?.focusMode !== false) {
+            settingsPatch.targetGame = { ...FX.settings.targetGame, on: false };
+          }
+          saveSettings(settingsPatch);
           FX.setActive?.(true);
         } else {
           saveSettings({ gestures: { ...g, ...patch } });
         }
-        FX.showStatus?.(`${label}: ${!cur ? 'ON' : 'OFF'}`, 'info');
+        FX.showStatus?.(`${label}: ${nextVal ? 'ON' : 'OFF'}`, 'info');
         updateHUD();
       });
     }
@@ -647,16 +680,17 @@
       meshBtn.addEventListener('click', () => {
         pressEffect(meshBtn);
         const els = FX.settings?.elements || {};
-        const cur = !!els.lines?.on;
-        saveSettings({
-          elements: {
-            ...els,
-            lines: { ...els.lines, on: !cur },
-            nodes: { ...els.nodes, on: !cur },
-          },
+        const cur = els.lines?.on !== false;
+        const nextVal = !cur;
+        const nextElements = {};
+        ['lines', 'glow', 'triangles', 'nodes', 'shards', 'dust'].forEach((k) => {
+          nextElements[k] = { ...(els[k] || {}), on: nextVal };
         });
-        if (!cur) FX.setActive?.(true);
-        FX.showStatus?.(`Plexus Mesh: ${!cur ? 'ON' : 'OFF'}`, 'info');
+        const patch = { elements: { ...els, ...nextElements } };
+        if (nextVal) patch.enabled = true;
+        saveSettings(patch);
+        if (nextVal) FX.setActive?.(true);
+        FX.showStatus?.(`Plexus Mesh: ${nextVal ? 'ON' : 'OFF'}`, 'info');
         updateHUD();
       });
     }
@@ -667,8 +701,13 @@
       gameToggleBtn.addEventListener('click', () => {
         pressEffect(gameToggleBtn);
         const cur = !!FX.settings?.targetGame?.on;
-        saveSettings({ targetGame: { ...(FX.settings?.targetGame || {}), on: !cur } });
-        if (!cur) FX.setActive?.(true);
+        const nextOn = !cur;
+        const patch = {
+          targetGame: { ...(FX.settings?.targetGame || {}), on: nextOn },
+        };
+        if (nextOn) patch.enabled = true;
+        saveSettings(patch);
+        if (nextOn) FX.setActive?.(true);
         FX.showStatus?.(cur ? 'Target Game OFF' : '🎯 Target Game ON: Use 👉 finger gun to pop balloons!', 'ok');
         updateHUD();
       });
@@ -701,8 +740,9 @@
     if (gameResetBtn) {
       gameResetBtn.addEventListener('click', () => {
         pressEffect(gameResetBtn);
-        if (FX.resetGame) FX.resetGame();
-        if (FX.engine?.resetGame) FX.engine.resetGame();
+        FX.resetGame?.();
+        FX.engine?.resetGame?.();
+        FX.activeGestures?.resetGame?.();
         FX.showStatus?.('Score reset!', 'ok');
         updateHUD();
       });
@@ -714,8 +754,18 @@
       drawToggleBtn.addEventListener('click', () => {
         pressEffect(drawToggleBtn);
         const cur = !!FX.settings?.airDraw?.on;
-        saveSettings({ airDraw: { ...(FX.settings?.airDraw || {}), on: !cur } });
-        if (!cur) FX.setActive?.(true);
+        const nextOn = !cur;
+        const patch = {
+          airDraw: { ...(FX.settings?.airDraw || {}), on: nextOn },
+        };
+        if (nextOn) {
+          patch.enabled = true;
+          if (FX.settings?.targetGame?.on && FX.settings?.targetGame?.focusMode !== false) {
+            patch.targetGame = { ...FX.settings.targetGame, on: false };
+          }
+        }
+        saveSettings(patch);
+        if (nextOn) FX.setActive?.(true);
         FX.showStatus?.(cur ? 'Air Draw OFF' : 'Air Draw ON: Point or pinch fingertip in air', 'ok');
         updateHUD();
       });
@@ -749,7 +799,8 @@
     if (clearCanvasBtn) {
       clearCanvasBtn.addEventListener('click', () => {
         pressEffect(clearCanvasBtn);
-        if (FX.engine?.clearDrawings) FX.engine.clearDrawings();
+        FX.engine?.clearDrawings?.();
+        FX.activeGestures?.clearDrawings?.();
         FX.showStatus?.('Canvas cleared', 'info');
       });
     }
@@ -759,9 +810,7 @@
     if (powerBtn) {
       powerBtn.addEventListener('click', () => {
         pressEffect(powerBtn);
-        FX.toggle?.();
-        setTimeout(updateHUD, 40);
-        setTimeout(updateHUD, 180);
+        toggleMasterPower();
       });
     }
 
@@ -818,12 +867,12 @@
     if (!container) return;
     const S = getSettingsModule();
     const cfg = FX.settings || (S ? S.DEFAULTS : {});
-    const active = FX.engine?.isActive ? FX.engine.isActive() : false;
+    const active = FX.engine ? FX.engine.isActive() : (cfg.enabled !== false);
 
     // Header badge
     const statusBadge = container.querySelector('#plexus-hud-status');
     if (statusBadge) {
-      if (cfg.targetGame?.on) {
+      if (active && cfg.targetGame?.on) {
         statusBadge.textContent = '🎯 Gaming';
         statusBadge.style.background = 'rgba(255, 0, 127, 0.3)';
         statusBadge.style.color = '#ff66c4';
@@ -847,29 +896,29 @@
     }
 
     // 1. Tab FX button states
+    const g = cfg.gestures || {};
+    const gesturesMasterOn = active && (g.on !== false);
     const masterFxBtn = container.querySelector('#plexus-toggle-master-fx');
     if (masterFxBtn) {
-      const on = !!cfg.gestures?.on;
-      masterFxBtn.classList.toggle('active', on);
+      masterFxBtn.classList.toggle('active', gesturesMasterOn);
       const span = masterFxBtn.querySelector('span');
-      if (span) span.textContent = on ? '⚡ FX & Gestures: ON' : '⚡ FX & Gestures: OFF';
+      if (span) span.textContent = gesturesMasterOn ? '⚡ FX & Gestures: ON' : '⚡ FX & Gestures: OFF';
     }
 
-    const g = cfg.gestures || {};
     const setBtnActive = (id, on) => {
       const b = container.querySelector(id);
       if (b) b.classList.toggle('active', Boolean(on));
     };
 
-    setBtnActive('#plexus-fx-chidori', g.chidori !== false);
-    setBtnActive('#plexus-fx-spider', g.spiderWeb !== false);
-    setBtnActive('#plexus-fx-saiyan', g.superSaiyan !== false);
-    setBtnActive('#plexus-fx-sword', g.laserSword !== false);
-    setBtnActive('#plexus-fx-shield', g.mysticShield !== false);
-    setBtnActive('#plexus-fx-ball', g.energyBall !== false);
-    setBtnActive('#plexus-fx-party', g.party !== false);
-    setBtnActive('#plexus-fx-gun', g.fingerGun !== false);
-    setBtnActive('#plexus-fx-mesh', cfg.elements?.lines?.on !== false);
+    setBtnActive('#plexus-fx-chidori', gesturesMasterOn && g.chidori !== false);
+    setBtnActive('#plexus-fx-spider', gesturesMasterOn && g.spiderWeb !== false);
+    setBtnActive('#plexus-fx-saiyan', gesturesMasterOn && g.superSaiyan !== false);
+    setBtnActive('#plexus-fx-sword', gesturesMasterOn && g.laserSword !== false);
+    setBtnActive('#plexus-fx-shield', gesturesMasterOn && g.mysticShield !== false);
+    setBtnActive('#plexus-fx-ball', gesturesMasterOn && g.energyBall !== false);
+    setBtnActive('#plexus-fx-party', gesturesMasterOn && g.party !== false);
+    setBtnActive('#plexus-fx-gun', gesturesMasterOn && g.fingerGun !== false);
+    setBtnActive('#plexus-fx-mesh', active && cfg.elements?.lines?.on !== false);
 
     // 2. Tab Game states
     const gameToggleBtn = container.querySelector('#plexus-game-toggle');

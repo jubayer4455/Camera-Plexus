@@ -17,6 +17,8 @@
 
   function ensurePill() {
     if (pill && pill.isConnected) return pill;
+    const root = document.body || document.documentElement;
+    if (!root) return null;
     pill = document.createElement('div');
     pill.setAttribute('role', 'status');
     pill.style.cssText = [
@@ -25,13 +27,14 @@
       'font:500 12px/1.4 system-ui,sans-serif', 'box-shadow:0 2px 8px rgba(0,0,0,.35)',
       'pointer-events:none', 'transition:opacity .4s', 'max-width:70vw',
     ].join(';');
-    (document.body || document.documentElement).appendChild(pill);
+    root.appendChild(pill);
     return pill;
   }
 
   // sticky: keep visible (errors and "waiting" states); otherwise fade out.
   FX.showStatus = (text, tone = 'info', sticky = false) => {
     const el = ensurePill();
+    if (!el) return;
     el.textContent = `Camera Plexus · ${text}`;
     el.style.background = TONES[tone] || TONES.info;
     el.style.opacity = '1';

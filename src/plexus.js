@@ -80,8 +80,18 @@
   function getHaloSprite() {
     if (haloSprite) return haloSprite;
     const size = 64;
-    const canvas = new OffscreenCanvas(size, size);
+    let canvas = null;
+    if (typeof OffscreenCanvas !== 'undefined') {
+      canvas = new OffscreenCanvas(size, size);
+    } else if (typeof document !== 'undefined' && document.createElement) {
+      canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+    } else {
+      return null;
+    }
     const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
     const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
     grad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
     grad.addColorStop(0.35, 'rgba(255, 255, 255, 0.45)');
@@ -232,8 +242,8 @@
     const gestures = FX.createGestureManager ? FX.createGestureManager() : null;
     let hands = new Map();
     let rawDetected = [];
-    let level = 0;
-    let target = 0;
+    let level = 1;
+    let target = 1;
     let lastTick = null;
     let frame = { w: 1280, h: 720 };
     let geom = buildGeometry([], 0, 0, frame.w, frame.h);
@@ -257,16 +267,26 @@
     }
 
     function setActive(on) {
-      target = on ? 1 : 0;
+      const nextTarget = on ? 1 : 0;
+      if (nextTarget === target) return;
+      target = nextTarget;
+      if (!on) {
+        level = 0;
+      }
       const origins = geom.tipSets.flat().filter((p) => (p.ext ?? 1) > 0.2);
       const center = [{ x: frame.w / 2, y: frame.h / 2 }];
-      if (els().shards?.on) particles.burstShards(origins.length ? origins : center, scale(), on ? 60 : 90);
+      if (on && els().shards?.on) particles.burstShards(origins.length ? origins : center, scale(), 60);
       if (!on && els().dust?.on) particles.dustAlong(geom.segments, DISSOLVE_DUST, scale(), true);
     }
 
     function update(now, nextSettings, w, h) {
       settings = nextSettings || settings;
       frame = { w, h };
+      if (settings.enabled === false) {
+        target = 0;
+        level = 0;
+        return;
+      }
       const dt = lastTick === null ? 0 : Math.min((now - lastTick) / 1000, 0.08);
       lastTick = now;
       const step = (dt * 1000) / FADE_MS;
@@ -312,7 +332,8 @@
       const list = [...hands.values()].sort((a, b) => a.palm.x - b.palm.x);
       geom = buildGeometry(list, level, now, w, h);
 
-      if (target === 1 && dt > 0) {
+      const gameFocus = Boolean(settings.targetGame?.on && settings.targetGame?.focusMode !== false);
+      if (target === 1 && dt > 0 && !gameFocus) {
         if (els().dust?.on) {
           const dustRate = settings.ecoMode ? DUST_PER_SECOND * 0.4 : DUST_PER_SECOND;
           const n = Math.floor(dustRate * dt + Math.random());
@@ -330,10 +351,11 @@
         });
       }
       particles.update(dt, scale(), now);
-      if (gestures) gestures.update(rawDetected, now, settings, w, h);
+      if (gestures && target > 0) gestures.update(rawDetected, now, settings, w, h);
     }
 
     function isIdle() {
+      if (settings.enabled === false || (level === 0 && target === 0)) return true;
       const gActive = Boolean(
         (settings.gestures?.on && (rawDetected.length > 0 || level > 0)) ||
         settings.airDraw?.on ||
@@ -385,10 +407,12 @@
     function drawNode(ctx, p, radius, alpha, coreRgb, unit, halo) {
       if (halo) {
         const sprite = getHaloSprite();
-        const hr = radius * 3.5;
-        ctx.globalAlpha = alpha * 0.5;
-        ctx.drawImage(sprite, p.x - hr, p.y - hr, hr * 2, hr * 2);
-        ctx.globalAlpha = 1;
+        if (sprite) {
+          const hr = radius * 3.5;
+          ctx.globalAlpha = alpha * 0.5;
+          ctx.drawImage(sprite, p.x - hr, p.y - hr, hr * 2, hr * 2);
+          ctx.globalAlpha = 1;
+        }
       }
       ctx.fillStyle = `rgba(${coreRgb}, ${alpha})`;
       ctx.beginPath();
@@ -428,21 +452,27 @@
     }
 
     function draw(ctx, w, h, now = performance.now()) {
+      if (settings.enabled === false || (target === 0 && level === 0)) return;
       const unit = Math.min(w, h) / 720;
       const e = els();
       const isRainbow = settings.rainbow?.on;
       const rSpeed = settings.rainbow?.speed || 1;
       const dustRgb = isRainbow ? rainbowRgb(now, 240, rSpeed) : rgb(e.dust?.color || '#d6c4ff');
       const shardsRgb = isRainbow ? rainbowRgb(now, 300, rSpeed) : rgb(e.shards?.color || '#ffffff');
+      const gameFocus = Boolean(settings.targetGame?.on && settings.targetGame?.focusMode !== false);
 
       ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      drawWeb(ctx, unit, now);
-      if (e.dust?.on) particles.drawDust(ctx, unit, dustRgb);
-      ctx.globalCompositeOperation = 'source-over';
-      if (e.shards?.on) {
-        const triRgb = isRainbow ? rainbowRgb(now, 120, rSpeed) : rgb(e.triangles?.color || '#a878ff');
-        particles.drawShards(ctx, unit, shardsRgb, triRgb);
+      if (!gameFocus) {
+        ctx.globalCompositeOperation = 'lighter';
+        drawWeb(ctx, unit, now);
+        if (e.dust?.on) particles.drawDust(ctx, unit, dustRgb);
+        ctx.globalCompositeOperation = 'source-over';
+        if (e.shards?.on) {
+          const triRgb = isRainbow ? rainbowRgb(now, 120, rSpeed) : rgb(e.triangles?.color || '#a878ff');
+          particles.drawShards(ctx, unit, shardsRgb, triRgb);
+        }
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
       }
 
       // Draw Gesture Animations & Air Canvas

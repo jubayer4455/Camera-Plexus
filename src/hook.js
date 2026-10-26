@@ -19,6 +19,10 @@
   }
   FX.hooked = true;
   FX.settings = S.sanitize({});
+  FX.active = FX.settings.enabled !== false;
+
+  const post = (type, extra = {}) => window.postMessage({ __plexus: type, ...extra }, '*');
+  FX.notifyState = (state) => post('state', state);
 
   const original = MediaDevices.prototype.getUserMedia;
 
@@ -58,19 +62,50 @@
   if (navigator.webkitGetUserMedia) navigator.webkitGetUserMedia = wrapLegacy(navigator.webkitGetUserMedia);
   if (navigator.mozGetUserMedia) navigator.mozGetUserMedia = wrapLegacy(navigator.mozGetUserMedia);
 
-  function toggleOrExplain() {
+  function setMasterActive(on) {
+    const next = Boolean(on);
+    FX.active = next;
+    FX.settings = S.sanitize({ ...FX.settings, enabled: next });
+    post('save-settings', { settings: FX.settings });
     if (FX.engine) {
-      FX.engine.toggle();
+      if (FX.engine.isActive() !== next) {
+        FX.engine.setActive(next);
+      } else {
+        FX.notifyState({ active: next, engine: true, tracking: 'ready' });
+      }
     } else {
-      FX.showStatus('camera not captured yet: turn your camera on (reload tab if already on)', 'error', true);
+      FX.notifyState({ active: next, engine: false, tracking: 'waiting for camera' });
+      FX.showStatus(next ? 'effect ON (ready for camera)' : 'effect OFF', next ? 'on' : 'info');
     }
+    FX.updateHUD?.();
+    return next;
+  }
+
+  function toggleOrExplain() {
+    const cur = FX.engine ? FX.engine.isActive() : (FX.settings?.enabled !== false);
+    return setMasterActive(!cur);
   }
   FX.toggle = toggleOrExplain;
-  FX.setActive = (on) => {
-    if (FX.engine) {
-      FX.engine.setActive(on);
-    }
-  };
+  FX.setActive = setMasterActive;
+
+  // Automatically wrap any already-playing local camera <video> elements on the page
+  function scanExistingVideos() {
+    if (!FX.isSupported?.()) return;
+    const base = document.documentElement?.dataset?.plexusBase || FX.baseUrl;
+    if (!base) return;
+    try {
+      const videos = document.querySelectorAll('video');
+      videos.forEach((v) => {
+        const stream = v.srcObject;
+        if (stream && typeof stream.getVideoTracks === 'function' && !stream.__plexusWrapped) {
+          const tracks = stream.getVideoTracks();
+          if (tracks.length > 0 && tracks[0].readyState === 'live') {
+            v.srcObject = FX.wrapStream(stream);
+          }
+        }
+      });
+    } catch (_) {}
+  }
 
   window.addEventListener(
     'keydown',
@@ -82,21 +117,37 @@
     true,
   );
 
-  // Bridge channel: same-window messages tagged with __plexus.
-  const post = (type, extra = {}) => window.postMessage({ __plexus: type, ...extra }, '*');
-  FX.notifyState = (state) => post('state', state);
-
   window.addEventListener('message', (event) => {
     if (event.source !== window || !event.data || typeof event.data.__plexus !== 'string') return;
     const msg = event.data;
-    if (msg.__plexus === 'settings') {
+    if (msg.baseUrl) {
+      FX.baseUrl = msg.baseUrl;
+      if (document.documentElement && !document.documentElement.dataset.plexusBase) {
+        document.documentElement.dataset.plexusBase = msg.baseUrl;
+      }
+      scanExistingVideos();
+    }
+    if (msg.__plexus === 'settings' && msg.settings) {
       const prevSound = FX.settings.clapSound;
       FX.settings = S.sanitize(msg.settings);
-      if (FX.engine && prevSound !== FX.settings.clapSound) FX.engine.refreshAudio();
+      const nextActive = FX.settings.enabled !== false;
+      FX.active = nextActive;
+      if (FX.engine) {
+        if (FX.engine.isActive() !== nextActive) FX.engine.setActive(nextActive);
+        if (prevSound !== FX.settings.clapSound) FX.engine.refreshAudio();
+      } else {
+        FX.notifyState({ active: nextActive, engine: false, tracking: 'waiting for camera' });
+      }
+      FX.updateHUD?.();
+    }
+    if (msg.__plexus === 'set-active') {
+      setMasterActive(Boolean(msg.active));
     }
     if (msg.__plexus === 'toggle') toggleOrExplain();
   });
   post('hello');
+  setTimeout(scanExistingVideos, 500);
+  setTimeout(scanExistingVideos, 2000);
 
   const announce = () => FX.showStatus('loaded · waiting for your camera', 'info', true);
   if (document.readyState === 'loading') {

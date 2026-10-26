@@ -28,7 +28,8 @@
     iframe.tabIndex = -1;
     iframe.style.cssText =
       'position:fixed;width:1px;height:1px;left:-10px;top:-10px;border:0;opacity:0;pointer-events:none;';
-    document.documentElement.appendChild(iframe);
+    const root = document.documentElement || document.body;
+    if (root) root.appendChild(iframe);
 
     const state = { ready: false, failed: null, inflightSince: null };
     const loadTimer = setTimeout(() => {
@@ -64,16 +65,24 @@
       const now = performance.now();
       if (now - lastSubmitTime < MIN_SUBMIT_INTERVAL_MS) return;
       const busy = state.inflightSince !== null && now - state.inflightSince < REPLY_TIMEOUT_MS;
+      if (!iframe.isConnected) {
+        const r = document.documentElement || document.body;
+        if (r) r.appendChild(iframe);
+      }
       if (!state.ready || busy || !iframe.contentWindow) return;
       state.inflightSince = now;
       lastSubmitTime = now;
       try {
-        const w = frame.displayWidth;
-        const h = frame.displayHeight;
+        const w = frame.displayWidth || frame.codedWidth || 0;
+        const h = frame.displayHeight || frame.codedHeight || 0;
+        if (w <= 0 || h <= 0) {
+          state.inflightSince = null;
+          return;
+        }
         const scale = Math.min(1, DETECT_WIDTH / w);
         const bitmap = await createImageBitmap(frame, {
-          resizeWidth: Math.round(w * scale),
-          resizeHeight: Math.round(h * scale),
+          resizeWidth: Math.max(1, Math.round(w * scale)),
+          resizeHeight: Math.max(1, Math.round(h * scale)),
           resizeQuality: 'low',
         });
         iframe.contentWindow.postMessage({ type: 'plexus:frame', bitmap, segment }, origin, [bitmap]);

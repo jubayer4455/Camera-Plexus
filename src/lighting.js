@@ -14,8 +14,15 @@
 
   function layer(prev, w, h) {
     if (prev && prev.canvas.width === w && prev.canvas.height === h) return prev;
-    const canvas = new OffscreenCanvas(w, h);
-    return { canvas, ctx: canvas.getContext('2d') };
+    let canvas = null;
+    if (typeof OffscreenCanvas !== 'undefined') {
+      canvas = new OffscreenCanvas(w, h);
+    } else if (typeof document !== 'undefined' && document.createElement) {
+      canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+    }
+    return canvas ? { canvas, ctx: canvas.getContext('2d') } : null;
   }
 
   function createLighting() {

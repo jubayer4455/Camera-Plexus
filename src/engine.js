@@ -14,7 +14,9 @@
     const lighting = FX.createLighting();
     const clap = FX.createClapDetector();
     const doubleClap = FX.createDoubleClap();
-    const stats = { active: false, hands: 0, claps: 0, toggles: 0, lastResultAt: 0, tracking: 'loading' };
+    const initialActive = FX.active !== undefined ? Boolean(FX.active) : (currentSettings().enabled !== false);
+    const stats = { active: initialActive, hands: 0, claps: 0, toggles: 0, lastResultAt: 0, tracking: 'loading' };
+    renderer.setActive(initialActive);
     let aspect = 16 / 9;
     let lastSubmit = -Infinity;
     let stopAudio = null;
@@ -23,13 +25,16 @@
     const publish = () => FX.notifyState?.({ active: stats.active, engine: true, tracking: stats.tracking });
 
     function setActive(on) {
-      stats.active = on;
+      const next = Boolean(on);
+      stats.active = next;
+      FX.active = next;
       stats.toggles += 1;
-      renderer.setActive(on);
-      FX.playSound?.(on ? 'on' : 'off');
-      const hint = on && stats.hands === 0 ? ' (no hands in view yet)' : '';
-      FX.showStatus(on ? `effect ON${hint}` : 'effect OFF', on ? 'on' : 'info');
+      renderer.setActive(next);
+      FX.playSound?.(next ? 'on' : 'off');
+      const hint = next && stats.hands === 0 ? ' (show hands to camera)' : '';
+      FX.showStatus(next ? `effect ON${hint}` : 'effect OFF', next ? 'on' : 'info');
       publish();
+      FX.updateHUD?.();
     }
 
     const toggle = () => setActive(!stats.active);
@@ -48,7 +53,10 @@
       stats.lastResultAt = now;
       renderer.setHands(hands, now);
       if (mask) lighting.setMask(mask, now);
-      if (clap.update(hands, now, aspect)) onClap(now, 'camera');
+      const cfg = currentSettings();
+      if (cfg.clapSound && !cfg.targetGame?.on && clap.update(hands, now, aspect)) {
+        onClap(now, 'camera');
+      }
     }
 
     function onTrackerStatus(kind, detail) {
@@ -96,12 +104,19 @@
     }
 
     function tick(now, w, h) {
-      renderer.update(now, currentSettings(), w, h);
+      const cfg = currentSettings();
+      if (typeof cfg.enabled === 'boolean' && cfg.enabled !== stats.active) {
+        stats.active = cfg.enabled;
+        FX.active = cfg.enabled;
+        renderer.setActive(cfg.enabled);
+      }
+      renderer.update(now, cfg, w, h);
     }
 
     function paint(ctx, w, h, now) {
+      if (!stats.active) return;
       lighting.apply(ctx, w, h, renderer.level(), renderer.lightSources(), currentSettings(), now);
-      renderer.draw(ctx, w, h);
+      renderer.draw(ctx, w, h, now);
     }
 
     publish();
@@ -109,11 +124,13 @@
       onFrame,
       tick,
       paint,
-      isIdle: () => renderer.isIdle(),
+      isIdle: () => !stats.active || renderer.isIdle(),
       toggle,
       setActive,
       isActive: () => stats.active,
       clearDrawings: () => renderer.clearDrawings?.(),
+      resetGame: () => renderer.resetGame?.(),
+      getGameStats: () => renderer.getGameStats?.(),
       attachAudio,
       refreshAudio,
       stats: () => ({ ...stats, tracker: tracker.status() }),
@@ -122,7 +139,7 @@
 
   FX.getEngine = () => {
     if (!FX.engine) {
-      const base = document.documentElement.dataset.plexusBase;
+      const base = document.documentElement?.dataset?.plexusBase || FX.baseUrl;
       if (!base) throw new Error('Meet Plexus: extension base URL missing');
       FX.engine = createEngine(base);
       if (FX.audioSource) FX.engine.attachAudio(FX.audioSource);

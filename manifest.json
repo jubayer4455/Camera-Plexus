@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Camera Plexus - Glowing Hand Effects & Gestures",
-  "version": "2.0.0",
-  "description": "Glowing plexus lines, gestures (peace, heart, thumbs up, mystic shield, energy ball), and air drawing for Google Meet, Messenger, OmeTV, and all camera video calls.",
+  "version": "2.1.0",
+  "description": "Interactive glowing hand FX, anime powers, finger gun target game, and air drawing for Google Meet, Messenger, and webcams.",
   "icons": { "48": "icons/icon48.png", "128": "icons/icon128.png" },
   "permissions": ["storage", "activeTab", "tabs"],
   "host_permissions": ["<all_urls>"],
@@ -43,7 +43,7 @@
   "web_accessible_resources": [
     {
       "resources": ["detector/*", "vendor/*"],
-      "matches": ["*://*/*"]
+      "matches": ["<all_urls>"]
     }
   ],
   "content_security_policy": {

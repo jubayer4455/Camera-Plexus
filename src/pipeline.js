@@ -80,6 +80,7 @@
   }
 
   FX.wrapStream = (stream) => {
+    if (!stream || stream.__plexusWrapped) return stream;
     const engine = FX.getEngine();
     const audio = stream.getAudioTracks();
     if (audio.length) {
@@ -87,6 +88,11 @@
       engine.attachAudio(audio[0]);
     }
     const video = stream.getVideoTracks().map((t) => processVideoTrack(t, engine));
-    return new MediaStream([...audio, ...video]);
+    const out = new MediaStream([...audio, ...video]);
+    try {
+      stream.__plexusWrapped = true;
+      out.__plexusWrapped = true;
+    } catch (_) {}
+    return out;
   };
 })();

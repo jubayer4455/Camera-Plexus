@@ -141,7 +141,11 @@
 
     // Gestures & Anime FX
     bindCheck('gesturesOn', () => settings.gestures?.on,
-      (on) => ({ ...settings, gestures: { ...settings.gestures, on } })),
+      (on) => ({
+        ...settings,
+        enabled: on ? true : settings.enabled,
+        gestures: { ...settings.gestures, on },
+      })),
     bindCheck('gestureChidori', () => settings.gestures?.chidori,
       (chidori) => ({ ...settings, gestures: { ...settings.gestures, chidori } })),
     bindCheck('gestureSpiderWeb', () => settings.gestures?.spiderWeb,
@@ -157,21 +161,38 @@
     bindCheck('gestureBall', () => settings.gestures?.energyBall,
       (energyBall) => ({ ...settings, gestures: { ...settings.gestures, energyBall } })),
     bindCheck('gesturePeace', () => settings.gestures?.peace,
-      (peace) => ({ ...settings, gestures: { ...settings.gestures, peace } })),
+      (peace) => ({
+        ...settings,
+        gestures: { ...settings.gestures, peace, party: peace || settings.gestures?.thumbsUp || settings.gestures?.heart },
+      })),
     bindCheck('gestureThumbsUp', () => settings.gestures?.thumbsUp,
-      (thumbsUp) => ({ ...settings, gestures: { ...settings.gestures, thumbsUp } })),
+      (thumbsUp) => ({
+        ...settings,
+        gestures: { ...settings.gestures, thumbsUp, party: thumbsUp || settings.gestures?.peace || settings.gestures?.heart },
+      })),
     bindCheck('gestureHeart', () => settings.gestures?.heart,
-      (heart) => ({ ...settings, gestures: { ...settings.gestures, heart } })),
+      (heart) => ({
+        ...settings,
+        gestures: { ...settings.gestures, heart, party: heart || settings.gestures?.peace || settings.gestures?.thumbsUp },
+      })),
 
     // Interactive Target Game
     bindCheck('targetGameOn', () => settings.targetGame?.on,
-      (on) => ({ ...settings, targetGame: { ...settings.targetGame, on } })),
+      (on) => ({
+        ...settings,
+        enabled: on ? true : settings.enabled,
+        targetGame: { ...settings.targetGame, on },
+      })),
     bindCheck('targetGameFocus', () => settings.targetGame?.focusMode !== false,
       (focusMode) => ({ ...settings, targetGame: { ...settings.targetGame, focusMode } })),
 
     // Air Drawing
     bindCheck('airDrawOn', () => settings.airDraw?.on,
-      (on) => ({ ...settings, airDraw: { ...settings.airDraw, on } })),
+      (on) => ({
+        ...settings,
+        enabled: on ? true : settings.enabled,
+        airDraw: { ...settings.airDraw, on },
+      })),
     (() => {
       const col = $('airDrawColor');
       if (col) {
@@ -257,23 +278,23 @@
     if (personRow) personRow.classList.toggle('disabled', !settings.personLight?.on);
   }
 
+  let lastState = null;
+
   function showState(state) {
+    if (state) lastState = state;
     const label = $('state');
     const button = $('toggle');
     if (!button || !label) return;
 
     button.disabled = false;
+    const isActive = (state && typeof state.active === 'boolean')
+      ? state.active
+      : (settings.enabled !== false);
 
-    if (!state) {
-      label.textContent = 'Ready · Open camera in Meet, Messenger, OmeTV...';
-      label.classList.remove('on');
-      button.textContent = '⚡ Turn On';
-      button.classList.remove('active');
-      return;
-    }
-
-    if (state.active) {
-      label.textContent = `✨ Camera Plexus ACTIVE (${state.tracking || 'tracking'})`;
+    if (isActive) {
+      label.textContent = state?.engine
+        ? `✨ Camera Plexus ACTIVE (${state.tracking || 'tracking'})`
+        : '✨ Camera Plexus ON · Ready for camera';
       label.classList.add('on');
       button.textContent = '⚡ Turn Off';
       button.classList.add('active');
@@ -281,10 +302,10 @@
       label.classList.remove('on');
       button.textContent = '⚡ Turn On';
       button.classList.remove('active');
-      if (state.engine) {
-        label.textContent = 'Camera ready · Click to activate';
+      if (state?.engine) {
+        label.textContent = 'Camera paused · Click to Turn On';
       } else {
-        label.textContent = 'Ready · Waiting for camera stream';
+        label.textContent = 'Effects OFF · Click to Turn On';
       }
     }
   }
@@ -292,27 +313,27 @@
   const toggleBtn = $('toggle');
   if (toggleBtn) {
     toggleBtn.addEventListener('click', async () => {
-      toggleBtn.disabled = true;
-      try {
-        const id = await activeTabId();
-        let state = null;
-        if (id !== undefined) {
-          try {
-            state = await chrome.tabs.sendMessage(id, { type: 'plexus:toggle' });
-          } catch (_) {}
-        }
-        broadcast({ type: 'plexus:toggle' });
-        showState(state);
-      } finally {
-        toggleBtn.disabled = false;
-      }
+      const curActive = (lastState && typeof lastState.active === 'boolean')
+        ? lastState.active
+        : (settings.enabled !== false);
+      const nextActive = !curActive;
+      lastState = { ...(lastState || {}), active: nextActive };
+      save({ ...settings, enabled: nextActive }, false);
+      showState(lastState);
+      broadcast({ type: 'plexus:set-active', active: nextActive });
     });
   }
 
   const resetBtn = $('reset');
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
-      if (S) save(S.sanitize({}), false);
+      if (S) {
+        const next = S.sanitize({});
+        lastState = { ...(lastState || {}), active: true };
+        save(next, false);
+        showState(lastState);
+        broadcast({ type: 'plexus:set-active', active: true });
+      }
     });
   }
 
@@ -334,12 +355,18 @@
 
     if (S) settings = S.sanitize(stored || {});
     render();
+    showState({ active: settings.enabled !== false, engine: false });
 
     try {
       const state = await ask('plexus:state');
-      showState(state);
+      if (state) {
+        if (typeof settings.enabled === 'boolean' && stored) {
+          state.active = settings.enabled;
+        }
+        showState(state);
+      }
     } catch (_) {
-      showState(null);
+      showState({ active: settings.enabled !== false, engine: false });
     }
   }
 

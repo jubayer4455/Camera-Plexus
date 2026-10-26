@@ -256,3 +256,97 @@ test('gestures.js loads and initializes gesture manager without errors', () => {
   assert.strictEqual(typeof gm.draw, 'function');
   assert.strictEqual(typeof gm.getGameStats, 'function');
 });
+
+test('all gestures, target game, and air draw update and draw on canvas without throwing', () => {
+  const S = require('../src/settings.js');
+  require('../src/particles.js');
+  require('../src/gestures.js');
+  const { createPlexusRenderer } = require('../src/plexus.js');
+
+  const renderer = createPlexusRenderer();
+  assert.strictEqual(renderer.level(), 1, 'Renderer starts active by default');
+
+  // Create mock 2D canvas context
+  const makeCtx = () => ({
+    save: () => {},
+    restore: () => {},
+    translate: () => {},
+    rotate: () => {},
+    scale: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    quadraticCurveTo: () => {},
+    bezierCurveTo: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    rect: () => {},
+    roundRect: () => {},
+    fillRect: () => {},
+    strokeRect: () => {},
+    fill: () => {},
+    stroke: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+    drawImage: () => {},
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+  });
+  const ctx = makeCtx();
+
+  // 1. Test Chidori (Fist)
+  const fistHand = { handedness: 'Right', landmarks: createSampleHand({ thumb: 'curled', index: 'curled', middle: 'curled', ring: 'curled', pinky: 'curled' }) };
+  renderer.setHands([fistHand], 1000);
+  renderer.update(1000, S.sanitize({}), 1280, 720);
+  renderer.draw(ctx, 1280, 720, 1000);
+
+  // 2. Test Spider-Man Web (🤟)
+  const spiderHand = { handedness: 'Right', landmarks: createSampleHand({ thumb: 'extended', index: 'extended', middle: 'curled', ring: 'curled', pinky: 'extended' }) };
+  renderer.setHands([spiderHand], 2000);
+  renderer.update(2000, S.sanitize({}), 1280, 720);
+  renderer.draw(ctx, 1280, 720, 2000);
+
+  // 3. Test Target Game & Finger Gun
+  const gunCocked = { handedness: 'Right', landmarks: createSampleHand({ thumb: 'up', index: 'extended', middle: 'curled', ring: 'curled', pinky: 'curled' }) };
+  const gunPulled = { handedness: 'Right', landmarks: createSampleHand({ thumb: 'curled', index: 'extended', middle: 'curled', ring: 'curled', pinky: 'curled' }) };
+  const gameSettings = S.sanitize({ targetGame: { on: true, focusMode: true, speed: 'fast' } });
+  renderer.setHands([gunCocked], 3000);
+  renderer.update(3000, gameSettings, 1280, 720);
+  renderer.setHands([gunPulled], 3300);
+  renderer.update(3300, gameSettings, 1280, 720);
+  renderer.draw(ctx, 1280, 720, 3300);
+
+  // 4. Test Master Power OFF (enabled: false)
+  const offSettings = S.sanitize({ enabled: false, targetGame: { on: true } });
+  renderer.update(3500, offSettings, 1280, 720);
+  assert.strictEqual(renderer.isIdle(), true, 'Renderer must be idle when enabled is false');
+});
+
+test('all source files have valid JavaScript syntax', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const vm = require('node:vm');
+  const root = path.resolve(__dirname, '..');
+  const files = [
+    'src/settings.js',
+    'src/status.js',
+    'src/clap.js',
+    'src/gestures.js',
+    'src/particles.js',
+    'src/plexus.js',
+    'src/lighting.js',
+    'src/tracker.js',
+    'src/audio-clap.js',
+    'src/engine.js',
+    'src/pipeline.js',
+    'src/hook.js',
+    'src/hud.js',
+    'src/bridge.js',
+    'popup/popup.js',
+  ];
+  for (const rel of files) {
+    const code = fs.readFileSync(path.join(root, rel), 'utf8');
+    assert.doesNotThrow(() => new vm.Script(code, { filename: rel }), `${rel} must parse without syntax errors`);
+  }
+});

@@ -34,3 +34,23 @@ test('presets change colors but keep on/off choices', () => {
 test('rgb converts hex to an rgba() component list', () => {
   assert.strictEqual(S.rgb('#a878ff'), '168, 120, 255');
 });
+
+test('manifest.json is valid for Chrome Web Store publication and all referenced files exist', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const root = path.resolve(__dirname, '..');
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
+
+  assert.strictEqual(manifest.manifest_version, 3);
+  assert.ok(manifest.description.length <= 132, `Description length (${manifest.description.length}) must be <= 132 chars for Chrome Web Store`);
+
+  const filesToCheck = [
+    manifest.icons['48'],
+    manifest.icons['128'],
+    manifest.action.default_popup,
+    ...manifest.content_scripts.flatMap((cs) => cs.js),
+  ];
+  for (const rel of filesToCheck) {
+    assert.ok(fs.existsSync(path.join(root, rel)), `Referenced file ${rel} must exist`);
+  }
+});

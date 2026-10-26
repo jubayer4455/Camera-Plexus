@@ -5,6 +5,7 @@
   const ELEMENTS = ['lines', 'glow', 'triangles', 'nodes', 'shards', 'dust'];
 
   const DEFAULTS = Object.freeze({
+    enabled: true,
     elements: {
       lines: { on: true, color: '#ffffff' },
       glow: { on: true, color: '#a878ff' },
@@ -102,6 +103,7 @@
     const rb = src.rainbow || {};
 
     return {
+      enabled: bool(src.enabled, DEFAULTS.enabled),
       elements,
       darken: clamp(src.darken, 0, 60, DEFAULTS.darken),
       lightSpill: {
@@ -164,7 +166,8 @@
 
   // '#a878ff' -> '168, 120, 255' for rgba() strings.
   function rgb(hex) {
-    const n = parseInt(hex.slice(1), 16);
+    const safe = typeof hex === 'string' && HEX.test(hex) ? hex : '#a878ff';
+    const n = parseInt(safe.slice(1), 16);
     return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
   }
 
