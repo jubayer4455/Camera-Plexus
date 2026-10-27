@@ -21,7 +21,7 @@
   const PALM_ARCH_BONES = [
     [5, 9], [9, 13], [13, 17], [17, 0], [0, 5],
   ];
-  const KNUCKLE_INDICES = [0, 1, 2, 5, 9, 13, 17];
+  const KNUCKLE_INDICES = [0, 1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 17, 18, 19];
   const SATELLITES = 4;
   const FADE_MS = 400;
   const HAND_TIMEOUT_MS = 500;
@@ -134,16 +134,17 @@
     return haloSprite;
   }
 
-  // Adaptive responsive smoothing filter (One-Euro filter principle)
+  // Adaptive responsive smoothing filter (linear Euclidean distance scaling)
   // Eliminates dragging/lag when hand moves while filtering webcam noise when still
   function smoothPoint(prevPt, targetPt, dt) {
     if (!prevPt) return { ...targetPt };
     const dx = targetPt.x - prevPt.x;
     const dy = targetPt.y - prevPt.y;
-    const distSq = dx * dx + dy * dy;
-    // distSq: small jitter (< 0.0001) -> rate ~ 28 (smooth factor ~0.60)
-    // distSq: hand in motion (> 0.002) -> rate up to 200 (smooth factor >0.99 for ZERO lag lock)
-    const rate = 28 + Math.min(180, distSq * 35000);
+    const dist = Math.hypot(dx, dy);
+    // Exponential adaptive tracking rate:
+    // Still (dist < 0.002, ~2px camera noise): rate ~ 40, eliminates shaky sensor jitter
+    // Moving (dist >= 0.006, >7px movement): rate accelerates to 360+, providing instant zero-lag tracking
+    const rate = 40 + Math.min(340, Math.max(0, dist - 0.002) * 9000);
     const factor = 1 - Math.exp(-dt * rate);
     return {
       x: prevPt.x + dx * factor,
@@ -262,8 +263,7 @@
 
       // 2. Anatomical Finger Bones: perfectly tracking along each finger joint
       FINGER_CHAINS.forEach((chain, fi) => {
-        const ext = extList[fi] ?? 1;
-        const boneAlpha = alpha * (0.35 + 0.65 * ext);
+        const boneAlpha = 0.95 * alpha;
         for (let j = 0; j < chain.length - 1; j += 1) {
           const p1 = pts[chain[j]];
           const p2 = pts[chain[j + 1]];
@@ -385,7 +385,7 @@
 
       // Adaptive continuous interpolation towards target positions & finger extensions
       // Eliminates smoothing lag when hand moves while filtering webcam jitter when still
-      const extFactor = 1 - Math.exp(-dt * 26);
+      const extFactor = 1 - Math.exp(-dt * 45);
 
       hands = new Map(
         [...hands]
@@ -558,10 +558,9 @@
           }));
         geom.tipSets.forEach((tips, hi) =>
           tips.forEach((p) => {
-            if ((p.ext ?? 1) < 0.08) return;
             const ext = p.ext ?? 1;
-            const nodeAlpha = geom.handAlpha[hi] * ext;
-            const nodeRadius = 3.4 * unit * (0.45 + 0.55 * ext);
+            const nodeAlpha = geom.handAlpha[hi] * Math.max(0.68, ext);
+            const nodeRadius = 3.4 * unit * (0.6 + 0.4 * ext);
             drawNode(ctx, p, nodeRadius, nodeAlpha, nodeRgb, unit, haloOn);
           }));
       }

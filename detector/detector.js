@@ -25,9 +25,9 @@ const createLandmarker = async (delegate) => HandLandmarker.createFromOptions(aw
   baseOptions: { modelAssetPath: vendor('hand_landmarker.task'), delegate },
   runningMode: 'VIDEO',
   numHands: 2,
-  minHandDetectionConfidence: 0.5,
-  minHandPresenceConfidence: 0.5,
-  minTrackingConfidence: 0.5,
+  minHandDetectionConfidence: 0.4,
+  minHandPresenceConfidence: 0.4,
+  minTrackingConfidence: 0.35,
 });
 
 const createSegmenter = async (delegate) => ImageSegmenter.createFromOptions(await fileset(), {

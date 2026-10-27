@@ -70,6 +70,7 @@
 
     // Cooldown duration
     const BURST_COOLDOWN_MS = 1200;
+    let allowBlur = true;
 
     function clearDrawings() {
       strokes = [];
@@ -914,7 +915,7 @@
       ctx.scale(size / 30, size / 30);
       ctx.fillStyle = color;
       ctx.shadowColor = color;
-      ctx.shadowBlur = 14;
+      ctx.shadowBlur = allowBlur ? 14 : 0;
       ctx.globalAlpha = alpha;
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -999,7 +1000,7 @@
       const a = web.alpha;
 
       ctx.shadowColor = '#00ffff';
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = allowBlur ? 8 : 0;
       ctx.strokeStyle = `rgba(220, 245, 255, ${a * 0.9})`;
       ctx.lineWidth = 1.6;
 
@@ -1161,7 +1162,7 @@
 
       // 1. Outer radiant glow bloom
       ctx.shadowColor = `rgb(${bladeColor})`;
-      ctx.shadowBlur = 24 * unit;
+      ctx.shadowBlur = allowBlur ? 24 * unit : 0;
       ctx.strokeStyle = `rgba(${bladeColor}, ${alpha * 0.4})`;
       ctx.lineWidth = bWidth * 2.2;
       ctx.lineCap = 'round';
@@ -1203,7 +1204,7 @@
       const r = b.radius;
 
       ctx.shadowColor = b.color;
-      ctx.shadowBlur = FX.isMobile ? 0 : 16 * unit;
+      ctx.shadowBlur = allowBlur ? 16 * unit : 0;
 
       // Balloon body gradient
       const grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
@@ -1267,7 +1268,7 @@
       const bW = 6 * unit;
 
       ctx.shadowColor = '#00ffff';
-      ctx.shadowBlur = FX.isMobile ? 0 : 12 * unit;
+      ctx.shadowBlur = allowBlur ? 12 * unit : 0;
 
       // Outer neon trail
       ctx.strokeStyle = 'rgba(0, 240, 255, 0.85)';
@@ -1309,7 +1310,7 @@
       // Neon reticle crosshair
       ctx.translate(tx, ty);
       ctx.shadowColor = '#00ffff';
-      ctx.shadowBlur = FX.isMobile ? 0 : 8 * unit;
+      ctx.shadowBlur = allowBlur ? 8 * unit : 0;
       ctx.strokeStyle = 'rgba(0, 240, 255, 0.9)';
       ctx.lineWidth = 2 * unit;
 
@@ -1342,7 +1343,7 @@
       ctx.translate(f.x, f.y);
       ctx.fillStyle = `rgba(255, 255, 255, ${f.alpha})`;
       ctx.shadowColor = '#00ffff';
-      ctx.shadowBlur = FX.isMobile ? 0 : 18 * unit;
+      ctx.shadowBlur = allowBlur ? 18 * unit : 0;
 
       const r = f.radius * unit * (0.8 + 0.4 * f.alpha);
       ctx.beginPath();
@@ -1371,7 +1372,7 @@
       ctx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
       ctx.lineWidth = 1.6 * unit;
       ctx.shadowColor = 'rgba(0, 240, 255, 0.35)';
-      ctx.shadowBlur = FX.isMobile ? 0 : 12 * unit;
+      ctx.shadowBlur = allowBlur ? 12 * unit : 0;
 
       ctx.beginPath();
       if (typeof ctx.roundRect === 'function') {
@@ -1402,7 +1403,7 @@
         ctx.font = `bold ${Math.round(20 * unit)}px -apple-system, sans-serif`;
         ctx.fillStyle = p.color || '#ffff00';
         ctx.shadowColor = p.color || '#ffff00';
-        ctx.shadowBlur = FX.isMobile ? 0 : 10 * unit;
+        ctx.shadowBlur = allowBlur ? 10 * unit : 0;
         ctx.globalAlpha = p.alpha;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -1414,6 +1415,7 @@
     function draw(ctx, w, h, now, settings, smoothedHands) {
       ctx.save();
       const unit = Math.min(w, h) / 720;
+      allowBlur = !FX.isMobile && !settings.ecoMode;
 
       // 0. 🔥 Super Saiyan Aura (DBZ Screen Flame Columns & Lightning)
       if (superSaiyanAlpha > 0.01) {
@@ -1430,7 +1432,7 @@
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
           ctx.shadowColor = stroke.color;
-          ctx.shadowBlur = 10;
+          ctx.shadowBlur = allowBlur ? 10 : 0;
 
           ctx.beginPath();
           ctx.moveTo(pts[0].x, pts[0].y);
@@ -1492,7 +1494,7 @@
           ctx.save();
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
           ctx.shadowColor = '#00ffff';
-          ctx.shadowBlur = 10;
+          ctx.shadowBlur = allowBlur ? 10 : 0;
           ctx.lineWidth = 3 * unit;
           ctx.beginPath();
           ctx.moveTo(p.sx, p.sy);

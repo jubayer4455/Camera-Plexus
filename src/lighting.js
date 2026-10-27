@@ -139,11 +139,11 @@
       if (useSpill) {
         const k = (settings.lightSpill.strength / 100) * level;
         ctx.save();
-        ctx.globalCompositeOperation = 'soft-light';
-        ctx.globalAlpha = Math.min(1, k * 1.4);
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = Math.min(0.85, k * 1.1);
         ctx.drawImage(light.canvas, 0, 0, w, h);
         ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = k * 0.15;
+        ctx.globalAlpha = k * 0.18;
         ctx.drawImage(light.canvas, 0, 0, w, h);
         ctx.restore();
       }

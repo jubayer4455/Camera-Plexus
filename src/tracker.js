@@ -22,6 +22,8 @@
   function createTracker(baseUrl, onHands, onStatus = () => {}) {
     const origin = new URL(baseUrl).origin;
     let lastSubmitTime = 0;
+    let offCanvas = null;
+    let offCtx = null;
     const iframe = document.createElement('iframe');
     iframe.src = new URL('detector/detector.html', baseUrl).href;
     iframe.setAttribute('aria-hidden', 'true');
@@ -90,7 +92,7 @@
     // segment: also ask for a person mask (only needed for person lighting).
     async function submit(frame, segment = false, ecoMode = false) {
       const now = performance.now();
-      const minInterval = ecoMode ? 40 : (isMobileDevice ? 32 : 22);
+      const minInterval = ecoMode ? 32 : (isMobileDevice ? 28 : 16);
       if (now - lastSubmitTime < minInterval) return;
       if (state.inflightSince !== null && now - state.inflightSince >= REPLY_TIMEOUT_MS) {
         state.inflightSince = null;
@@ -115,13 +117,28 @@
           state.inflightSince = null;
           return;
         }
-        const detectWidth = ecoMode ? (isMobileDevice ? 220 : 260) : (isMobileDevice ? 280 : 340);
+        const detectWidth = ecoMode ? (isMobileDevice ? 180 : 220) : (isMobileDevice ? 240 : 256);
         const scale = Math.min(1, detectWidth / w);
-        const bitmap = await createImageBitmap(frame, {
-          resizeWidth: Math.max(1, Math.round(w * scale)),
-          resizeHeight: Math.max(1, Math.round(h * scale)),
-          resizeQuality: 'low',
-        });
+        const dw = Math.max(1, Math.round(w * scale));
+        const dh = Math.max(1, Math.round(h * scale));
+        let bitmap = null;
+        if (typeof OffscreenCanvas !== 'undefined') {
+          if (!offCanvas || offCanvas.width !== dw || offCanvas.height !== dh) {
+            offCanvas = new OffscreenCanvas(dw, dh);
+            offCtx = offCanvas.getContext('2d', { alpha: false, desynchronized: true }) || offCanvas.getContext('2d');
+          }
+          if (offCtx && typeof offCanvas.transferToImageBitmap === 'function') {
+            offCtx.drawImage(frame, 0, 0, dw, dh);
+            bitmap = offCanvas.transferToImageBitmap();
+          }
+        }
+        if (!bitmap) {
+          bitmap = await createImageBitmap(frame, {
+            resizeWidth: dw,
+            resizeHeight: dh,
+            resizeQuality: 'low',
+          });
+        }
         iframe.contentWindow.postMessage({ type: 'plexus:frame', bitmap, segment }, origin, [bitmap]);
       } catch (error) {
         state.inflightSince = null;
