@@ -344,6 +344,12 @@
       FX.settings = { ...FX.settings, ...patch };
     }
     const next = FX.settings;
+    if (typeof next.enabled === 'boolean') {
+      FX.active = next.enabled;
+      if (FX.engine && FX.engine.isActive() !== next.enabled) {
+        FX.engine.setActive(next.enabled);
+      }
+    }
     window.postMessage({ __plexus: 'save-settings', settings: next }, '*');
     window.postMessage({ __plexus: 'settings', settings: next }, '*');
   }
@@ -616,7 +622,8 @@
     // 1. Tab FX controls
     const masterFxBtn = container.querySelector('#plexus-toggle-master-fx');
     if (masterFxBtn) {
-      masterFxBtn.addEventListener('click', () => {
+      masterFxBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(masterFxBtn);
         const cur = !!FX.settings?.gestures?.on;
         const nextOn = !cur;
@@ -639,7 +646,8 @@
     function bindFxToggle(id, key, label) {
       const btn = container.querySelector(id);
       if (!btn) return;
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(btn);
         const g = FX.settings?.gestures || {};
         const masterOn = g.on !== false;
@@ -680,7 +688,8 @@
 
     const meshBtn = container.querySelector('#plexus-fx-mesh');
     if (meshBtn) {
-      meshBtn.addEventListener('click', () => {
+      meshBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(meshBtn);
         const els = FX.settings?.elements || {};
         const cur = els.lines?.on !== false;
@@ -701,7 +710,8 @@
     // 2. Tab Game controls
     const gameToggleBtn = container.querySelector('#plexus-game-toggle');
     if (gameToggleBtn) {
-      gameToggleBtn.addEventListener('click', () => {
+      gameToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(gameToggleBtn);
         const cur = !!FX.settings?.targetGame?.on;
         const nextOn = !cur;
@@ -718,7 +728,8 @@
 
     const gameFocusBtn = container.querySelector('#plexus-game-focus');
     if (gameFocusBtn) {
-      gameFocusBtn.addEventListener('click', () => {
+      gameFocusBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(gameFocusBtn);
         const cur = FX.settings?.targetGame?.focusMode !== false;
         saveSettings({ targetGame: { ...(FX.settings?.targetGame || {}), focusMode: !cur } });
@@ -729,7 +740,8 @@
 
     const gameSpeedBtn = container.querySelector('#plexus-game-speed');
     if (gameSpeedBtn) {
-      gameSpeedBtn.addEventListener('click', () => {
+      gameSpeedBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(gameSpeedBtn);
         const cur = FX.settings?.targetGame?.speed === 'fast';
         const next = cur ? 'normal' : 'fast';
@@ -741,7 +753,8 @@
 
     const gameResetBtn = container.querySelector('#plexus-game-reset');
     if (gameResetBtn) {
-      gameResetBtn.addEventListener('click', () => {
+      gameResetBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(gameResetBtn);
         FX.resetGame?.();
         FX.engine?.resetGame?.();
@@ -754,7 +767,8 @@
     // 3. Tab Draw controls
     const drawToggleBtn = container.querySelector('#plexus-draw-toggle');
     if (drawToggleBtn) {
-      drawToggleBtn.addEventListener('click', () => {
+      drawToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(drawToggleBtn);
         const cur = !!FX.settings?.airDraw?.on;
         const nextOn = !cur;
@@ -776,7 +790,8 @@
 
     const drawColors = container.querySelectorAll('.plexus-swatch');
     drawColors.forEach((swatch) => {
-      swatch.addEventListener('click', () => {
+      swatch.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(swatch);
         const col = swatch.dataset.color;
         saveSettings({ airDraw: { ...(FX.settings?.airDraw || {}), color: col } });
@@ -788,7 +803,8 @@
     function bindDrawSize(id, sz) {
       const btn = container.querySelector(id);
       if (!btn) return;
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(btn);
         saveSettings({ airDraw: { ...(FX.settings?.airDraw || {}), size: sz } });
         updateHUD();
@@ -800,7 +816,8 @@
 
     const clearCanvasBtn = container.querySelector('#plexus-draw-clear');
     if (clearCanvasBtn) {
-      clearCanvasBtn.addEventListener('click', () => {
+      clearCanvasBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(clearCanvasBtn);
         FX.engine?.clearDrawings?.();
         FX.activeGestures?.clearDrawings?.();
@@ -811,7 +828,8 @@
     // 4. Tab Setup controls
     const powerBtn = container.querySelector('#plexus-btn-power');
     if (powerBtn) {
-      powerBtn.addEventListener('click', () => {
+      powerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(powerBtn);
         toggleMasterPower();
       });
@@ -819,7 +837,9 @@
 
     const presetSelect = container.querySelector('#plexus-select-preset');
     if (presetSelect) {
-      presetSelect.addEventListener('change', () => {
+      presetSelect.addEventListener('click', (e) => e.stopPropagation());
+      presetSelect.addEventListener('change', (e) => {
+        e.stopPropagation();
         const preset = presetSelect.value;
         const S = getSettingsModule();
         if (FX.settings && S) {
@@ -832,7 +852,8 @@
 
     const resetAllBtn = container.querySelector('#plexus-btn-reset-all');
     if (resetAllBtn) {
-      resetAllBtn.addEventListener('click', () => {
+      resetAllBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(resetAllBtn);
         const S = getSettingsModule();
         if (S) {
@@ -848,7 +869,8 @@
 
     const audioBtn = container.querySelector('#plexus-btn-audio');
     if (audioBtn) {
-      audioBtn.addEventListener('click', () => {
+      audioBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(audioBtn);
         const cur = !!FX.settings?.audioPulse?.on;
         saveSettings({ audioPulse: { ...(FX.settings?.audioPulse || {}), on: !cur } });
@@ -859,18 +881,20 @@
 
     const ecoBtn = container.querySelector('#plexus-btn-eco');
     if (ecoBtn) {
-      ecoBtn.addEventListener('click', () => {
+      ecoBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(ecoBtn);
         const cur = !!FX.settings?.ecoMode;
         saveSettings({ ecoMode: !cur });
-        FX.showStatus?.(cur ? 'Eco Mode OFF' : 'Eco Mode ON', 'info');
+        FX.showStatus?.(!cur ? '🌱 Eco Mode ON (Zero Lag · Low CPU/GPU)' : 'Eco Mode OFF (Full Visuals)', 'ok');
         updateHUD();
       });
     }
 
     const clapBtn = container.querySelector('#plexus-btn-clap');
     if (clapBtn) {
-      clapBtn.addEventListener('click', () => {
+      clapBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         pressEffect(clapBtn);
         const cur = !!FX.settings?.clapSound;
         saveSettings({ clapSound: !cur });

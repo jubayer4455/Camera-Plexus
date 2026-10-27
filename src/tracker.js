@@ -88,9 +88,10 @@
     window.addEventListener('message', onMessage);
 
     // segment: also ask for a person mask (only needed for person lighting).
-    async function submit(frame, segment = false) {
+    async function submit(frame, segment = false, ecoMode = false) {
       const now = performance.now();
-      if (now - lastSubmitTime < MIN_SUBMIT_INTERVAL_MS) return;
+      const minInterval = ecoMode ? 40 : (isMobileDevice ? 32 : 22);
+      if (now - lastSubmitTime < minInterval) return;
       if (state.inflightSince !== null && now - state.inflightSince >= REPLY_TIMEOUT_MS) {
         state.inflightSince = null;
         timeoutCount += 1;
@@ -114,7 +115,8 @@
           state.inflightSince = null;
           return;
         }
-        const scale = Math.min(1, DETECT_WIDTH / w);
+        const detectWidth = ecoMode ? (isMobileDevice ? 220 : 260) : (isMobileDevice ? 280 : 340);
+        const scale = Math.min(1, detectWidth / w);
         const bitmap = await createImageBitmap(frame, {
           resizeWidth: Math.max(1, Math.round(w * scale)),
           resizeHeight: Math.max(1, Math.round(h * scale)),

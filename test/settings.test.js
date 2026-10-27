@@ -35,6 +35,16 @@ test('rgb converts hex to an rgba() component list', () => {
   assert.strictEqual(S.rgb('#a878ff'), '168, 120, 255');
 });
 
+test('eco mode toggles on/off and sanitizes correctly without losing state', () => {
+  const ecoOn = S.sanitize({ ecoMode: true });
+  assert.strictEqual(ecoOn.ecoMode, true);
+  const ecoOff = S.sanitize({ ecoMode: false });
+  assert.strictEqual(ecoOff.ecoMode, false);
+
+  const switchedPreset = S.applyPreset(ecoOn, 'Matrix');
+  assert.strictEqual(switchedPreset.ecoMode, true, 'Preset change preserves ecoMode state');
+});
+
 test('manifest.json is valid for Chrome Web Store publication and all referenced files exist', () => {
   const fs = require('node:fs');
   const path = require('node:path');

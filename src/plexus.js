@@ -432,20 +432,22 @@
       const gameFocus = Boolean(settings.targetGame?.on && settings.targetGame?.focusMode !== false);
       if (target === 1 && dt > 0 && !gameFocus) {
         if (els().dust?.on) {
-          const dustRate = settings.ecoMode ? DUST_PER_SECOND * 0.4 : DUST_PER_SECOND;
+          const dustRate = settings.ecoMode ? DUST_PER_SECOND * 0.15 : DUST_PER_SECOND;
           const n = Math.floor(dustRate * dt + Math.random());
-          particles.dustAlong(geom.segments, n, scale());
+          if (n > 0) particles.dustAlong(geom.segments, n, scale());
         }
-        list.forEach((hand, i) => {
-          if (hand.speed > 0.015 && Math.random() < hand.speed * 20) {
-            const openTips = geom.tipSets[i].filter((p) => p.ext > 0.25);
-            if (openTips.length > 0) {
-              const tip = openTips[Math.floor(Math.random() * openTips.length)];
-              if (els().shards?.on) particles.shedShard(tip.x, tip.y, scale());
-              if (els().dust?.on) particles.dustAt([tip], 5, scale());
+        if (!settings.ecoMode) {
+          list.forEach((hand, i) => {
+            if (hand.speed > 0.015 && Math.random() < hand.speed * 20) {
+              const openTips = geom.tipSets[i]?.filter((p) => p.ext > 0.25) || [];
+              if (openTips.length > 0) {
+                const tip = openTips[Math.floor(Math.random() * openTips.length)];
+                if (els().shards?.on) particles.shedShard(tip.x, tip.y, scale());
+                if (els().dust?.on) particles.dustAt([tip], 5, scale());
+              }
             }
-          }
-        });
+          });
+        }
       }
       particles.update(dt, scale(), now);
       if (gestures && target > 0) gestures.update(rawDetected, now, settings, w, h);
@@ -530,17 +532,29 @@
       const audioLevel = FX.getAudioLevel?.() || 0;
       const audioPulse = settings.audioPulse?.on ? 1 + audioLevel * (settings.audioPulse.strength / 50) : 1;
 
-      if (e.triangles?.on) {
-        geom.facets.forEach((f) => fill(ctx, f, triRgb, glowRgb));
+      if (e.triangles?.on && geom.facets.length) {
+        if (settings.ecoMode) {
+          ctx.fillStyle = `rgba(${triRgb}, 0.12)`;
+          ctx.beginPath();
+          geom.facets.forEach(([a, b, c]) => {
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.lineTo(c.x, c.y);
+          });
+          ctx.fill();
+        } else {
+          geom.facets.forEach((f) => fill(ctx, f, triRgb, glowRgb));
+        }
       }
-      if (e.glow?.on) strokeBatched(ctx, geom.segments, glowRgb, 6.5 * unit * audioPulse, 0.38);
-      if (e.lines?.on) strokeBatched(ctx, geom.segments, lineRgb, 1.8 * unit * audioPulse, 0.96);
+      if (e.glow?.on && !settings.ecoMode) strokeBatched(ctx, geom.segments, glowRgb, 6.5 * unit * audioPulse, 0.38);
+      if (e.lines?.on) strokeBatched(ctx, geom.segments, lineRgb, (settings.ecoMode ? 1.5 : 1.8) * unit * audioPulse, 0.96);
       if (e.nodes?.on) {
-        geom.sats.forEach((p) => drawNode(ctx, p, 1.6 * unit, 0.6 * level, nodeRgb, unit, e.glow?.on));
+        const haloOn = Boolean(e.glow?.on && !settings.ecoMode);
+        geom.sats.forEach((p) => drawNode(ctx, p, 1.6 * unit, 0.6 * level, nodeRgb, unit, haloOn));
         geom.jointSets?.forEach((joints, hi) =>
           joints.forEach((p) => {
             const nodeAlpha = geom.handAlpha[hi] * 0.75;
-            drawNode(ctx, p, 2.0 * unit, nodeAlpha, nodeRgb, unit, e.glow?.on);
+            drawNode(ctx, p, 2.0 * unit, nodeAlpha, nodeRgb, unit, haloOn);
           }));
         geom.tipSets.forEach((tips, hi) =>
           tips.forEach((p) => {
@@ -548,7 +562,7 @@
             const ext = p.ext ?? 1;
             const nodeAlpha = geom.handAlpha[hi] * ext;
             const nodeRadius = 3.4 * unit * (0.45 + 0.55 * ext);
-            drawNode(ctx, p, nodeRadius, nodeAlpha, nodeRgb, unit, e.glow?.on);
+            drawNode(ctx, p, nodeRadius, nodeAlpha, nodeRgb, unit, haloOn);
           }));
       }
     }

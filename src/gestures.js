@@ -925,11 +925,12 @@
     }
 
     // Drawing helper: ⚡ Chidori / Lightning Fist (Naruto)
-    function drawChidori(ctx, cx, cy, radius, alpha, now) {
+    function drawChidori(ctx, cx, cy, radius, alpha, now, settings) {
       if (alpha <= 0.01) return;
       ctx.save();
       ctx.translate(cx, cy);
 
+      const isEco = Boolean(settings?.ecoMode);
       // Core pulsating electrical sphere
       const pulse = 1 + Math.sin(now * 0.02) * 0.15;
       const curR = radius * pulse;
@@ -943,12 +944,12 @@
       ctx.arc(0, 0, curR * 1.6, 0, Math.PI * 2);
       ctx.fill();
 
-      // Branching lightning bolts (8 main bolts)
-      const boltCount = 8;
+      // Branching lightning bolts
+      const boltCount = isEco ? 4 : 8;
+      const segments = isEco ? 3 : 5;
       for (let i = 0; i < boltCount; i += 1) {
         const baseAngle = (i * Math.PI * 2) / boltCount + (Math.sin(now * 0.01 + i) * 0.3);
         const boltLen = curR * (1.2 + Math.sin(now * 0.025 + i * 2.3) * 0.6);
-        const segments = 5;
 
         ctx.beginPath();
         ctx.moveTo(0, 0);
@@ -960,8 +961,8 @@
           const ny = Math.sin(a) * r;
           ctx.lineTo(nx, ny);
 
-          // Sub-branch
-          if (s === 3) {
+          // Sub-branch (skipped in Eco Mode)
+          if (!isEco && s === 3) {
             ctx.moveTo(nx, ny);
             const branchA = a + (i % 2 === 0 ? 0.7 : -0.7);
             ctx.lineTo(nx + Math.cos(branchA) * (boltLen * 0.35), ny + Math.sin(branchA) * (boltLen * 0.35));
@@ -969,14 +970,16 @@
           }
         }
 
-        // Outer cyan glow
-        ctx.strokeStyle = `rgba(0, 229, 255, ${alpha * 0.85})`;
-        ctx.lineWidth = 4.5;
-        ctx.stroke();
+        if (!isEco) {
+          // Outer cyan glow
+          ctx.strokeStyle = `rgba(0, 229, 255, ${alpha * 0.85})`;
+          ctx.lineWidth = 4.5;
+          ctx.stroke();
+        }
 
         // Inner white hot core
         ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
-        ctx.lineWidth = 1.8;
+        ctx.lineWidth = isEco ? 2 : 1.8;
         ctx.stroke();
       }
 
@@ -1074,20 +1077,24 @@
     }
 
     // Drawing helper: 🔥 Super Saiyan Aura (Dragon Ball Z)
-    function drawSuperSaiyanAura(ctx, w, h, now, alpha) {
+    function drawSuperSaiyanAura(ctx, w, h, now, alpha, settings) {
       if (alpha <= 0.01) return;
       ctx.save();
 
-      // Screen edge golden vignette pulse
-      const vigGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
-      vigGrad.addColorStop(0, 'rgba(255, 215, 0, 0)');
-      vigGrad.addColorStop(0.7, `rgba(255, 170, 0, ${alpha * 0.18})`);
-      vigGrad.addColorStop(1, `rgba(255, 120, 0, ${alpha * 0.4})`);
-      ctx.fillStyle = vigGrad;
-      ctx.fillRect(0, 0, w, h);
+      const isEco = Boolean(settings?.ecoMode);
+
+      if (!isEco) {
+        // Screen edge golden vignette pulse (skipped in Eco Mode)
+        const vigGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
+        vigGrad.addColorStop(0, 'rgba(255, 215, 0, 0)');
+        vigGrad.addColorStop(0.7, `rgba(255, 170, 0, ${alpha * 0.18})`);
+        vigGrad.addColorStop(1, `rgba(255, 120, 0, ${alpha * 0.4})`);
+        ctx.fillStyle = vigGrad;
+        ctx.fillRect(0, 0, w, h);
+      }
 
       // Rising fiery Ki flame tongues from bottom of the screen
-      const columns = 16;
+      const columns = isEco ? 6 : 16;
       const colWidth = w / columns;
       for (let i = 0; i < columns; i += 1) {
         const x = i * colWidth;
@@ -1095,13 +1102,17 @@
         const flameH = (h * 0.45) + Math.sin(phase) * (h * 0.2) + Math.cos(phase * 1.7) * (h * 0.1);
         const flameW = colWidth * 1.4;
 
-        const flameGrad = ctx.createLinearGradient(x, h, x, h - flameH);
-        flameGrad.addColorStop(0, `rgba(255, 100, 0, ${alpha * 0.55})`);
-        flameGrad.addColorStop(0.4, `rgba(255, 200, 0, ${alpha * 0.65})`);
-        flameGrad.addColorStop(0.85, `rgba(255, 255, 120, ${alpha * 0.75})`);
-        flameGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        if (isEco) {
+          ctx.fillStyle = `rgba(255, 180, 20, ${alpha * 0.55})`;
+        } else {
+          const flameGrad = ctx.createLinearGradient(x, h, x, h - flameH);
+          flameGrad.addColorStop(0, `rgba(255, 100, 0, ${alpha * 0.55})`);
+          flameGrad.addColorStop(0.4, `rgba(255, 200, 0, ${alpha * 0.65})`);
+          flameGrad.addColorStop(0.85, `rgba(255, 255, 120, ${alpha * 0.75})`);
+          flameGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          ctx.fillStyle = flameGrad;
+        }
 
-        ctx.fillStyle = flameGrad;
         ctx.beginPath();
         ctx.moveTo(x - flameW * 0.3, h);
         const wave = Math.sin(now * 0.01 + i) * 20;
@@ -1113,13 +1124,14 @@
 
       // Golden electric arcs (Super Saiyan 2 style)
       ctx.strokeStyle = `rgba(255, 250, 160, ${alpha * 0.85})`;
-      ctx.lineWidth = 2.5;
-      for (let k = 0; k < 3; k += 1) {
+      ctx.lineWidth = isEco ? 1.8 : 2.5;
+      const arcCount = isEco ? 2 : 3;
+      for (let k = 0; k < arcCount; k += 1) {
         const lx = (w * (0.2 + k * 0.3)) + Math.sin(now * 0.015 + k * 3) * 60;
         const topY = h * (0.25 + Math.sin(now * 0.02 + k) * 0.2);
         ctx.beginPath();
         ctx.moveTo(lx, h);
-        const segs = 6;
+        const segs = isEco ? 4 : 6;
         for (let s = 1; s <= segs; s += 1) {
           const sy = h - (h - topY) * (s / segs);
           const sx = lx + (Math.sin(now * 0.025 + s * 2 + k * 5) * 35);
@@ -1405,7 +1417,7 @@
 
       // 0. 🔥 Super Saiyan Aura (DBZ Screen Flame Columns & Lightning)
       if (superSaiyanAlpha > 0.01) {
-        drawSuperSaiyanAura(ctx, w, h, now, superSaiyanAlpha);
+        drawSuperSaiyanAura(ctx, w, h, now, superSaiyanAlpha, settings);
       }
 
       // 1. Air Drawing strokes (Smooth Bézier canvas trails)
@@ -1457,7 +1469,7 @@
           const cx = hd ? hd.palm.x * w : chidoriPositions[sideKey].x;
           const cy = hd ? hd.palm.y * h : chidoriPositions[sideKey].y;
           const r = hd ? Math.max(45, hd.size * Math.min(w, h) * 0.95) : chidoriRadii[sideKey];
-          drawChidori(ctx, cx, cy, r, ca, now);
+          drawChidori(ctx, cx, cy, r, ca, now, settings);
         }
       });
 

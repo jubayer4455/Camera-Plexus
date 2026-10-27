@@ -22,12 +22,15 @@
     let stopAudio = null;
     let audioSource = null;
 
+    let lastKnownEnabled = FX.settings ? FX.settings.enabled : undefined;
     const publish = () => FX.notifyState?.({ active: stats.active, engine: true, tracking: stats.tracking });
 
     function setActive(on) {
       const next = Boolean(on);
       stats.active = next;
       FX.active = next;
+      lastKnownEnabled = next;
+      if (FX.settings) FX.settings.enabled = next;
       stats.toggles += 1;
       renderer.setActive(next);
       FX.playSound?.(next ? 'on' : 'off');
@@ -35,6 +38,9 @@
       FX.showStatus(next ? `effect ON${hint}` : 'effect OFF', next ? 'on' : 'info');
       publish();
       FX.updateHUD?.();
+      try {
+        window.postMessage({ __plexus: 'save-settings', settings: FX.settings }, '*');
+      } catch (_) {}
     }
 
     const toggle = () => setActive(!stats.active);
@@ -77,10 +83,12 @@
 
     function onFrame(frame, now) {
       aspect = frame.displayWidth / frame.displayHeight;
-      if (now - lastSubmit < DETECT_INTERVAL_MS) return Promise.resolve();
+      const cfg = currentSettings();
+      const interval = cfg.ecoMode ? 40 : DETECT_INTERVAL_MS;
+      if (now - lastSubmit < interval) return Promise.resolve();
       lastSubmit = now;
-      const wantMask = currentSettings().personLight.on && (stats.active || renderer.level() > 0);
-      return tracker.submit(frame, wantMask);
+      const wantMask = cfg.personLight.on && !cfg.ecoMode && (stats.active || renderer.level() > 0);
+      return tracker.submit(frame, wantMask, cfg.ecoMode);
     }
 
     // Re-evaluate the mic listener (source changed or the setting flipped).
@@ -105,10 +113,13 @@
 
     function tick(now, w, h) {
       const cfg = currentSettings();
-      if (typeof cfg.enabled === 'boolean' && cfg.enabled !== stats.active) {
-        stats.active = cfg.enabled;
-        FX.active = cfg.enabled;
-        renderer.setActive(cfg.enabled);
+      if (typeof cfg.enabled === 'boolean' && cfg.enabled !== lastKnownEnabled) {
+        lastKnownEnabled = cfg.enabled;
+        if (cfg.enabled !== stats.active) {
+          stats.active = cfg.enabled;
+          FX.active = cfg.enabled;
+          renderer.setActive(cfg.enabled);
+        }
       }
       renderer.update(now, cfg, w, h);
     }

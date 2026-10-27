@@ -113,18 +113,30 @@
     // level: 0..1 effect fade. sources: [{ x, y, r, a }] in frame pixels.
     function apply(ctx, w, h, level, sources, settings, now) {
       if (level <= 0) return;
+
+      // 🌱 Eco Mode: Completely bypass heavy offscreen canvas allocations, radial gradients,
+      // and expensive multi-pass soft-light compositing for maximum buttery 60fps performance!
+      if (settings.ecoMode) {
+        if (settings.darken > 0) darken(ctx, w, h, (settings.darken / 100) * level, false);
+        return;
+      }
+
+      const usePerson = settings.personLight?.on && mask !== null && now - maskAt < MASK_STALE_MS;
+      const useSpill = Boolean(settings.lightSpill?.on);
+
+      darken(ctx, w, h, (settings.darken / 100) * level, usePerson);
+      if (!sources.length || (!useSpill && !usePerson)) return;
+
       const lw = Math.max(1, Math.round(w * LAYER_SCALE));
       const lh = Math.max(1, Math.round(h * LAYER_SCALE));
       light = layer(light, lw, lh);
-      body = layer(body, lw, lh);
-      rim = layer(rim, lw, lh);
-      const usePerson = settings.personLight.on && mask !== null && now - maskAt < MASK_STALE_MS;
-
-      darken(ctx, w, h, (settings.darken / 100) * level, usePerson);
-      if (!sources.length) return;
+      if (usePerson) {
+        body = layer(body, lw, lh);
+        rim = layer(rim, lw, lh);
+      }
 
       paintLight(light, sources, rgb(settings.elements.glow.color));
-      if (settings.lightSpill.on) {
+      if (useSpill) {
         const k = (settings.lightSpill.strength / 100) * level;
         ctx.save();
         ctx.globalCompositeOperation = 'soft-light';
@@ -142,4 +154,5 @@
   }
 
   FX.createLighting = createLighting;
+  if (typeof module !== 'undefined') module.exports = { createLighting };
 })();
