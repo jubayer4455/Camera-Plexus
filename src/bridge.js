@@ -9,7 +9,7 @@
     document.documentElement.dataset.plexusBase = baseUrl;
   }
 
-  const SCHEMA_VERSION = 3;
+  const SCHEMA_VERSION = 4;
   let state = { active: true, engine: false, tracking: 'ready' };
   const post = (type, extra = {}) => window.postMessage({ __plexus: type, baseUrl, ...extra }, '*');
 

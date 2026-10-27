@@ -92,4 +92,15 @@ test('floating in-page HUD defaults to disabled and toolbar popup has all requir
   for (const id of requiredIds) {
     assert.ok(html.includes(`id="${id}"`), `Control #${id} must exist in popup.html`);
   }
+
+  // 4. Ensure schema version is updated to 4 to discard older configs
+  assert.strictEqual(S.SCHEMA_VERSION, 4);
+
+  // 5. Verify that neither hud.js nor status.js contains DOM injection code
+  const hudCode = fs.readFileSync(path.join(root, 'src', 'hud.js'), 'utf8');
+  assert.ok(!hudCode.includes('document.body.appendChild'), 'hud.js must not append any container to body');
+  assert.ok(!hudCode.includes('plexus-floating-hud.innerHTML'), 'hud.js must not build floating HTML');
+
+  const statusCode = fs.readFileSync(path.join(root, 'src', 'status.js'), 'utf8');
+  assert.ok(!statusCode.includes('root.appendChild(pill)'), 'status.js must not append on-screen pills to page');
 });

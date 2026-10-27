@@ -3,7 +3,7 @@
 // or stale stored value can never break rendering.
 (() => {
   const ELEMENTS = ['lines', 'glow', 'triangles', 'nodes', 'shards', 'dust'];
-  const SCHEMA_VERSION = 3;
+  const SCHEMA_VERSION = 4;
 
   const DEFAULTS = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -151,7 +151,7 @@
         speed: src.targetGame?.speed === 'fast' ? 'fast' : 'normal',
       },
       ecoMode: bool(src.ecoMode, DEFAULTS.ecoMode),
-      hudVisible: bool(src.hudVisible, DEFAULTS.hudVisible),
+      hudVisible: false,
     };
   }
 
