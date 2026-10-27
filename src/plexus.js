@@ -11,7 +11,18 @@
 
   const TIP_IDS = [4, 8, 12, 16, 20];
   const PALM_IDS = [0, 5, 9, 17];
-  const SATELLITES = 7;
+  const FINGER_CHAINS = [
+    [0, 1, 2, 3, 4],     // Thumb
+    [0, 5, 6, 7, 8],     // Index
+    [0, 9, 10, 11, 12],  // Middle
+    [0, 13, 14, 15, 16], // Ring
+    [0, 17, 18, 19, 20], // Pinky
+  ];
+  const PALM_ARCH_BONES = [
+    [5, 9], [9, 13], [13, 17], [17, 0], [0, 5],
+  ];
+  const KNUCKLE_INDICES = [0, 1, 2, 5, 9, 13, 17];
+  const SATELLITES = 4;
   const FADE_MS = 400;
   const HAND_TIMEOUT_MS = 500;
   const DUST_PER_SECOND = 200;
@@ -21,20 +32,23 @@
   const avg = (pts) => ({
     x: pts.reduce((s, p) => s + p.x, 0) / pts.length,
     y: pts.reduce((s, p) => s + p.y, 0) / pts.length,
+    z: pts.reduce((s, p) => s + (p.z || 0), 0) / pts.length,
   });
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-  const toPoint = (lm) => ({ x: lm[0], y: lm[1] });
+  const dist3D = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0));
+  const toPoint = (lm) => ({ x: lm[0], y: lm[1], z: lm[2] || 0 });
 
   // Intelligent finger extension detection (0 = curled in fist, 1 = fully extended)
-  // Ensures only opened fingers are targeted; curled fingers have zero clutter/nodes
+  // Uses 3D-depth invariant calculations to prevent fingers vanishing when pointing toward camera
   function getFingerExtensions(landmarks) {
     if (!landmarks || landmarks.length < 21) return [1, 1, 1, 1, 1];
-    const pt = (i) => ({ x: landmarks[i][0], y: landmarks[i][1] });
+    const pt = (i) => ({ x: landmarks[i][0], y: landmarks[i][1], z: landmarks[i][2] || 0 });
     const wrist = pt(0);
     const middleMcp = pt(9);
     const pinkyMcp = pt(17);
     const indexMcp = pt(5);
-    const handSize = Math.max(0.001, dist(wrist, middleMcp));
+    const handSize2D = Math.max(0.001, dist(wrist, middleMcp));
+    const handSize3D = Math.max(0.001, dist3D(wrist, middleMcp));
 
     // 4 fingers: Index (8,6,5), Middle (12,10,9), Ring (16,14,13), Pinky (20,18,17)
     const fingerConfigs = [
@@ -49,8 +63,16 @@
       const pPip = pt(pip);
       const pMcp = pt(mcp);
 
-      const rWrist = dist(pTip, wrist) / Math.max(0.001, dist(pPip, wrist));
-      const rMcp = dist(pTip, pMcp) / Math.max(0.001, dist(pPip, pMcp));
+      // 2D distance for pure plane tests
+      const rWrist2D = dist(pTip, wrist) / Math.max(0.001, dist(pPip, wrist));
+      const rMcp2D = dist(pTip, pMcp) / Math.max(0.001, dist(pPip, pMcp));
+
+      // 3D distance to protect against foreshortening in live webcam
+      const rWrist3D = dist3D(pTip, wrist) / Math.max(0.001, dist3D(pPip, wrist));
+      const rMcp3D = dist3D(pTip, pMcp) / Math.max(0.001, dist3D(pPip, pMcp));
+
+      const rWrist = Math.max(rWrist2D, rWrist3D);
+      const rMcp = Math.max(rMcp2D, rMcp3D);
 
       const scoreWrist = (rWrist - 0.98) / 0.28;
       const scoreMcp = (rMcp - 1.05) / 0.55;
@@ -62,9 +84,18 @@
     const thumbTip = pt(4);
     const thumbMcp = pt(2);
 
-    const dIndex = dist(thumbTip, indexMcp) / handSize;
-    const dMiddle = dist(thumbTip, middleMcp) / handSize;
-    const dPinky = dist(thumbTip, pinkyMcp) / Math.max(0.001, dist(thumbMcp, pinkyMcp));
+    const dIndex = Math.max(
+      dist(thumbTip, indexMcp) / handSize2D,
+      dist3D(thumbTip, indexMcp) / handSize3D
+    );
+    const dMiddle = Math.max(
+      dist(thumbTip, middleMcp) / handSize2D,
+      dist3D(thumbTip, middleMcp) / handSize3D
+    );
+    const dPinky = Math.max(
+      dist(thumbTip, pinkyMcp) / Math.max(0.001, dist(thumbMcp, pinkyMcp)),
+      dist3D(thumbTip, pinkyMcp) / Math.max(0.001, dist3D(thumbMcp, pinkyMcp))
+    );
 
     const sIndex = (dIndex - 0.32) / 0.22;
     const sPinky = (dPinky - 0.98) / 0.25;
@@ -103,16 +134,44 @@
     return haloSprite;
   }
 
+  // Adaptive responsive smoothing filter (One-Euro filter principle)
+  // Eliminates dragging/lag when hand moves while filtering webcam noise when still
+  function smoothPoint(prevPt, targetPt, dt) {
+    if (!prevPt) return { ...targetPt };
+    const dx = targetPt.x - prevPt.x;
+    const dy = targetPt.y - prevPt.y;
+    const distSq = dx * dx + dy * dy;
+    // distSq: small jitter (< 0.0001) -> rate ~ 28 (smooth factor ~0.60)
+    // distSq: hand in motion (> 0.002) -> rate up to 200 (smooth factor >0.99 for ZERO lag lock)
+    const rate = 28 + Math.min(180, distSq * 35000);
+    const factor = 1 - Math.exp(-dt * rate);
+    return {
+      x: prevPt.x + dx * factor,
+      y: prevPt.y + dy * factor,
+      z: prevPt.z !== undefined && targetPt.z !== undefined
+        ? prevPt.z + (targetPt.z - prevPt.z) * factor
+        : targetPt.z || 0,
+    };
+  }
+
   function smoothHand(prev, landmarks, now) {
-    const rawTips = TIP_IDS.map((i) => toPoint(landmarks[i]));
-    const palm = avg(PALM_IDS.map((i) => toPoint(landmarks[i])));
-    const size = dist(toPoint(landmarks[0]), toPoint(landmarks[9]));
+    if (!landmarks || !landmarks.length) return prev;
+    const rawPoints = landmarks.map((lm) => ({
+      x: lm[0],
+      y: lm[1],
+      z: lm[2] || 0,
+    }));
+    const rawTips = TIP_IDS.map((i) => rawPoints[i] || { x: 0.5, y: 0.5, z: 0 });
+    const palm = avg(PALM_IDS.map((i) => rawPoints[i] || { x: 0.5, y: 0.5, z: 0 }));
+    const size = dist(rawPoints[0] || { x: 0, y: 0 }, rawPoints[9] || { x: 0, y: 0 });
     const targetExt = getFingerExtensions(landmarks);
 
-    if (!prev) {
+    if (!prev || !prev.points || prev.points.length !== rawPoints.length) {
       return {
+        targetPoints: rawPoints,
+        points: rawPoints.map((p) => ({ ...p })),
         targetTips: rawTips,
-        tips: rawTips.map((p, i) => ({ ...p, ext: targetExt[i] })),
+        tips: rawTips.map((p, i) => ({ ...p, ext: targetExt[i] ?? 1 })),
         targetPalm: palm,
         palm: { ...palm },
         targetSize: size,
@@ -125,10 +184,12 @@
       };
     }
 
-    const moved = rawTips.reduce((s, p, i) => s + dist(p, prev.tips[i]), 0) / rawTips.length;
+    const moved = rawTips.reduce((s, p, i) => s + dist(p, prev.tips[i] || p), 0) / rawTips.length;
     return {
+      targetPoints: rawPoints,
+      points: prev.points,
       targetTips: rawTips,
-      tips: prev.tips, // will be smoothly interpolated on every tick
+      tips: prev.tips,
       targetPalm: palm,
       palm: prev.palm,
       targetSize: size,
@@ -142,27 +203,89 @@
   }
 
   function satellites(hand, idx, now, w, h) {
-    const r = hand.size * Math.min(w, h) * 1.1;
+    const r = hand.size * Math.min(w, h) * 0.65;
     const cx = hand.palm.x * w;
     const cy = hand.palm.y * h;
     return Array.from({ length: SATELLITES }, (_, i) => {
-      const phase = (now / 1000) * (0.5 + i * 0.13) + i * 2.1 + idx * 1.7;
-      const rr = r * (0.55 + 0.45 * Math.sin(phase * 1.3));
+      const phase = (now / 1000) * (0.6 + i * 0.15) + i * (Math.PI / 2) + idx * 1.5;
+      const rr = r * (0.7 + 0.3 * Math.sin(phase * 1.2));
       return { x: cx + Math.cos(phase) * rr, y: cy + Math.sin(phase * 0.9) * rr };
     });
   }
 
-  // Fast geometry builder with squared distance filtering and selective finger targeting
+  // Fast geometry builder with full skeletal finger tracking and sci-fi plexus webs
   function buildGeometry(handList, level, now, w, h) {
-    const tipSets = handList.map((hand) =>
-      hand.tips.map((p) => ({ x: p.x * w, y: p.y * h, ext: p.ext ?? 1 }))
-    );
+    const tipSets = [];
+    const jointSets = [];
     const palms = handList.map((hand) => ({ x: hand.palm.x * w, y: hand.palm.y * h }));
     const sats = handList.flatMap((hand, i) => satellites(hand, i, now, w, h));
     const handAlpha = handList.map((hand) => level * hand.vis);
     const webAlpha = level * Math.min(1, ...handList.map((hand) => hand.vis));
     const segments = [];
     const facets = [];
+
+    handList.forEach((hand, hi) => {
+      const alpha = handAlpha[hi];
+      if (alpha <= 0.001) return;
+
+      const rawPoints = hand.points || hand.targetPoints || [];
+      const pts = rawPoints.map((p) => ({
+        x: p.x * w,
+        y: p.y * h,
+      }));
+
+      // Fallback if landmark points are fewer than 21
+      if (pts.length < 21) {
+        tipSets.push(hand.tips.map((p) => ({ x: p.x * w, y: p.y * h, ext: p.ext ?? 1 })));
+        return;
+      }
+
+      const extList = hand.ext || [1, 1, 1, 1, 1];
+      const tips = TIP_IDS.map((tipIdx, fi) => ({
+        x: pts[tipIdx].x,
+        y: pts[tipIdx].y,
+        ext: extList[fi] ?? 1,
+        fingerIdx: fi,
+      }));
+      tipSets.push(tips);
+
+      // Collect knuckles & joints for sleek joint node rendering
+      const joints = KNUCKLE_INDICES.map((ki) => pts[ki]);
+      jointSets.push(joints);
+
+      const palm = palms[hi];
+
+      // 1. Palm Arch Chassis: glowing foundation connecting palm knuckles
+      PALM_ARCH_BONES.forEach(([a, b]) => {
+        segments.push([pts[a], pts[b], 0.75 * alpha]);
+      });
+
+      // 2. Anatomical Finger Bones: perfectly tracking along each finger joint
+      FINGER_CHAINS.forEach((chain, fi) => {
+        const ext = extList[fi] ?? 1;
+        const boneAlpha = alpha * (0.35 + 0.65 * ext);
+        for (let j = 0; j < chain.length - 1; j += 1) {
+          const p1 = pts[chain[j]];
+          const p2 = pts[chain[j + 1]];
+          const segAlpha = j === chain.length - 2 ? 0.95 * boneAlpha : 0.85 * boneAlpha;
+          segments.push([p1, p2, segAlpha]);
+        }
+      });
+
+      // 3. Sci-Fi Holographic Web between adjacent open fingertips & knuckles
+      for (let fi = 0; fi < 4; fi += 1) {
+        const tA = tips[fi];
+        const tB = tips[fi + 1];
+        const pairExt = (tA.ext ?? 1) * (tB.ext ?? 1);
+        if (pairExt > 0.1) {
+          segments.push([tA, tB, 0.75 * alpha * pairExt]);
+          const mcpA = pts[FINGER_CHAINS[fi][1]];
+          const mcpB = pts[FINGER_CHAINS[fi + 1][1]];
+          facets.push([mcpA, tA, tB, (handList.length >= 2 ? 0.08 : 0.14) * alpha * pairExt]);
+          facets.push([palm, mcpA, mcpB, 0.06 * alpha]);
+        }
+      }
+    });
 
     // Two hands connecting: scale segments and facets by finger extensions
     if (tipSets.length >= 2) {
@@ -183,58 +306,25 @@
       });
     }
 
-    // Intra-hand geometry: selective targeting based on finger open/curled state
-    tipSets.forEach((tips, hi) => {
-      const alpha = handAlpha[hi];
-      if (alpha <= 0.001) return;
-      const palm = palms[hi];
-
-      // Filter tips that are open/extended (ext > 0.08)
-      const openTips = tips
-        .map((p, idx) => ({ ...p, fingerIdx: idx }))
-        .filter((p) => p.ext > 0.08);
-
-      // Connect palm to each open fingertip with glowing energy beams
-      openTips.forEach((tip) => {
-        segments.push([palm, tip, 0.75 * alpha * tip.ext]);
-      });
-
-      // Connect consecutive open fingertips to each other and build facets with palm
-      if (openTips.length >= 2) {
-        for (let i = 0; i < openTips.length - 1; i += 1) {
-          const a = openTips[i];
-          const b = openTips[i + 1];
-          const pairExt = a.ext * b.ext;
-          segments.push([a, b, 0.75 * alpha * pairExt]);
-          facets.push([palm, a, b, (tipSets.length >= 2 ? 0.07 : 0.16) * alpha * pairExt]);
-        }
-      }
-    });
-
-    // Spatial pairing: only open tips (ext > 0.15) and satellites connect
-    const activeTips = tipSets.flatMap((tips) => tips.filter((p) => p.ext > 0.15));
-    const nodes = [...activeTips, ...sats];
-    const maxD = Math.min(w, h) * 0.24;
-    const maxDSq = maxD * maxD;
-    const nLen = nodes.length;
-
-    for (let i = 0; i < nLen; i += 1) {
-      const p1 = nodes[i];
-      const e1 = p1.ext !== undefined ? p1.ext : 1;
-      for (let j = i + 1; j < nLen; j += 1) {
-        const p2 = nodes[j];
-        const e2 = p2.ext !== undefined ? p2.ext : 1;
-        const dx = p1.x - p2.x;
-        const dy = p1.y - p2.y;
-        const dSq = dx * dx + dy * dy;
-        if (dSq < maxDSq) {
-          const d = Math.sqrt(dSq);
-          const sAlpha = (1 - d / maxD) * 0.3 * level * e1 * e2;
-          if (sAlpha > 0.01) segments.push([p1, p2, sAlpha]);
-        }
+    // Orbiting satellite ring around palm base
+    if (sats.length >= 2) {
+      for (let i = 0; i < sats.length; i += 1) {
+        const s1 = sats[i];
+        const s2 = sats[(i + 1) % sats.length];
+        segments.push([s1, s2, 0.22 * level]);
       }
     }
-    return { tipSets, palms, sats, segments, facets, handAlpha, sizes: handList.map((x) => x.size) };
+
+    return {
+      tipSets,
+      jointSets,
+      palms,
+      sats,
+      segments,
+      facets,
+      handAlpha,
+      sizes: handList.map((x) => x.size),
+    };
   }
 
   function createPlexusRenderer() {
@@ -293,10 +383,9 @@
       const step = (dt * 1000) / FADE_MS;
       level = target > level ? Math.min(target, level + step) : Math.max(target, level - step);
 
-      // Continuous exponential interpolation towards target positions & finger extensions
-      // Guarantees 60fps buttery movement even when detection is running at ~30fps
-      const smoothFactor = 1 - Math.exp(-dt * 24);
-      const extFactor = 1 - Math.exp(-dt * 20);
+      // Adaptive continuous interpolation towards target positions & finger extensions
+      // Eliminates smoothing lag when hand moves while filtering webcam jitter when still
+      const extFactor = 1 - Math.exp(-dt * 26);
 
       hands = new Map(
         [...hands]
@@ -306,21 +395,28 @@
             const updatedExt = (hd.ext || [1, 1, 1, 1, 1]).map((val, i) =>
               lerp(val, hd.targetExt ? hd.targetExt[i] : 1, extFactor)
             );
-            const updatedTips = hd.tips.map((p, i) => ({
-              x: lerp(p.x, hd.targetTips[i].x, smoothFactor),
-              y: lerp(p.y, hd.targetTips[i].y, smoothFactor),
-              ext: updatedExt[i],
-            }));
-            const updatedPalm = {
-              x: lerp(hd.palm.x, hd.targetPalm.x, smoothFactor),
-              y: lerp(hd.palm.y, hd.targetPalm.y, smoothFactor),
-            };
-            const updatedSize = lerp(hd.size, hd.targetSize, smoothFactor);
+            const rawPts = hd.targetPoints || [];
+            const prevPts = hd.points || rawPts;
+            const updatedPoints = rawPts.map((tp, i) =>
+              smoothPoint(prevPts[i] || tp, tp, dt)
+            );
+            const updatedTips = TIP_IDS.map((tipId, i) => {
+              const pt = updatedPoints[tipId] || { x: 0.5, y: 0.5 };
+              return {
+                x: pt.x,
+                y: pt.y,
+                z: pt.z,
+                ext: updatedExt[i] ?? 1,
+              };
+            });
+            const updatedPalm = smoothPoint(hd.palm, hd.targetPalm, dt);
+            const updatedSize = lerp(hd.size, hd.targetSize, Math.min(1, dt * 14));
             return [
               k,
               {
                 ...hd,
                 ext: updatedExt,
+                points: updatedPoints,
                 tips: updatedTips,
                 palm: updatedPalm,
                 size: updatedSize,
@@ -441,12 +537,17 @@
       if (e.lines?.on) strokeBatched(ctx, geom.segments, lineRgb, 1.8 * unit * audioPulse, 0.96);
       if (e.nodes?.on) {
         geom.sats.forEach((p) => drawNode(ctx, p, 1.6 * unit, 0.6 * level, nodeRgb, unit, e.glow?.on));
+        geom.jointSets?.forEach((joints, hi) =>
+          joints.forEach((p) => {
+            const nodeAlpha = geom.handAlpha[hi] * 0.75;
+            drawNode(ctx, p, 2.0 * unit, nodeAlpha, nodeRgb, unit, e.glow?.on);
+          }));
         geom.tipSets.forEach((tips, hi) =>
           tips.forEach((p) => {
             if ((p.ext ?? 1) < 0.08) return;
             const ext = p.ext ?? 1;
             const nodeAlpha = geom.handAlpha[hi] * ext;
-            const nodeRadius = 3.2 * unit * (0.4 + 0.6 * ext);
+            const nodeRadius = 3.4 * unit * (0.45 + 0.55 * ext);
             drawNode(ctx, p, nodeRadius, nodeAlpha, nodeRgb, unit, e.glow?.on);
           }));
       }

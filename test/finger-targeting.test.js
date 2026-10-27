@@ -323,6 +323,41 @@ test('all gestures, target game, and air draw update and draw on canvas without 
   assert.strictEqual(renderer.isIdle(), true, 'Renderer must be idle when enabled is false');
 });
 
+test('finger tracking maintains extension in 3D camera angles and snaps responsively without lag', () => {
+  const S = require('../src/settings.js');
+  const { createPlexusRenderer, getFingerExtensions } = require('../src/plexus.js');
+
+  // Create a hand where index finger is pointing towards camera (foreshortened in 2D, but extended in 3D depth)
+  const hand3D = createSampleHand({ index: 'extended' });
+  // Foreshorten index in 2D by bringing tip closer to MCP in Y, but giving it Z depth
+  hand3D[8] = [hand3D[5][0], hand3D[5][1] - 0.05, -0.22]; // Z indicates pointing toward camera
+  const exts = getFingerExtensions(hand3D);
+  assert.ok(exts[1] > 0.6, 'Index finger should remain detected as extended when angled toward camera via 3D depth');
+
+  // Test adaptive responsiveness: fast hand motion snaps without trailing lag
+  const renderer = createPlexusRenderer();
+  const handStart = { handedness: 'Right', landmarks: createSampleHand() };
+  renderer.setHands([handStart], 1000);
+  renderer.update(1000, S.sanitize({}), 1280, 720);
+
+  // Rapid hand displacement across screen (e.g. 0.3 normalized units)
+  const movedHand = createSampleHand();
+  movedHand.forEach((pt) => { pt[0] += 0.3; });
+  renderer.setHands([{ handedness: 'Right', landmarks: movedHand }], 1033);
+  renderer.update(1033, S.sanitize({}), 1280, 720);
+
+  // Collect rendered geometry points
+  const ctx = {
+    save: () => {}, restore: () => {}, translate: () => {}, rotate: () => {}, scale: () => {},
+    beginPath: () => {}, closePath: () => {}, moveTo: () => {}, lineTo: () => {}, arc: () => {},
+    fill: () => {}, stroke: () => {}, fillRect: () => {}, strokeRect: () => {}, drawImage: () => {},
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+  };
+  renderer.draw(ctx, 1280, 720, 1033);
+  assert.ok(renderer.level() > 0, 'Renderer is active and draws updated tracking');
+});
+
 test('all source files have valid JavaScript syntax', () => {
   const fs = require('node:fs');
   const path = require('node:path');

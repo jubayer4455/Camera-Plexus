@@ -10,9 +10,9 @@
     (typeof window !== 'undefined' && window.innerWidth <= 800 && 'ontouchstart' in window)
   );
 
-  // Dynamic mobile resolution: 320px on mobile devices for ultra-fast inference & zero lag!
-  const DETECT_WIDTH = isMobileDevice ? 320 : 440;
-  const MIN_SUBMIT_INTERVAL_MS = isMobileDevice ? 40 : 25;
+  // Dynamic resolution: 360px on desktop (300px on mobile) for near-instant inference & zero lag!
+  const DETECT_WIDTH = isMobileDevice ? 300 : 360;
+  const MIN_SUBMIT_INTERVAL_MS = isMobileDevice ? 32 : 18;
   const REPLY_TIMEOUT_MS = 1000;
   const LOAD_TIMEOUT_MS = 20000;
 

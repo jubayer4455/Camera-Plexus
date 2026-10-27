@@ -5,7 +5,7 @@
   const FX = (globalThis.__plexusFx = globalThis.__plexusFx || {});
   const S = globalThis.__plexusSettings;
 
-  const DETECT_INTERVAL_MS = 28; // ~35 tracking updates per second for lower latency & responsiveness
+  const DETECT_INTERVAL_MS = 20; // ~50 tracking updates per second for instantaneous responsiveness and zero lag
 
   const currentSettings = () => FX.settings || S.DEFAULTS;
 
