@@ -64,3 +64,32 @@ test('manifest.json is valid for Chrome Web Store publication and all referenced
     assert.ok(fs.existsSync(path.join(root, rel)), `Referenced file ${rel} must exist`);
   }
 });
+
+test('floating in-page HUD defaults to disabled and toolbar popup has all required tabs and controls', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const root = path.resolve(__dirname, '..');
+
+  // 1. Ensure floating HUD defaults to false
+  const defaults = S.sanitize({});
+  assert.strictEqual(defaults.hudVisible, false, 'hudVisible must default to false to prevent obstructing video calls/chat');
+
+  // 2. Ensure popup.html contains all 5 tabs and their matching panes
+  const html = fs.readFileSync(path.join(root, 'popup', 'popup.html'), 'utf8');
+  const expectedTabs = ['powers', 'game', 'draw', 'themes', 'setup'];
+  for (const tab of expectedTabs) {
+    assert.ok(html.includes(`data-tab="${tab}"`), `Tab ${tab} button must exist in popup.html`);
+    assert.ok(html.includes(`id="pane-${tab}"`), `Tab pane id="pane-${tab}" must exist in popup.html`);
+  }
+
+  // 3. Ensure essential control IDs exist in popup.html
+  const requiredIds = [
+    'toggle', 'state', 'gesturesOn', 'targetGameOn', 'airDrawOn',
+    'gameScoreVal', 'gameComboVal', 'gameHitsVal', 'gameSpeedBtn', 'gameResetBtn',
+    'airDrawClearBtn', 'airDrawColor', 'airDrawSize', 'presets', 'elements',
+    'ecoMode', 'reset',
+  ];
+  for (const id of requiredIds) {
+    assert.ok(html.includes(`id="${id}"`), `Control #${id} must exist in popup.html`);
+  }
+});

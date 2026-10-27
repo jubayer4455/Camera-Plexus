@@ -85,6 +85,31 @@
       sendResponse({ ok: true, state });
       return true;
     }
+    if (msg?.type === 'plexus:clear-drawings') {
+      post('clear-drawings');
+      sendResponse({ ok: true });
+      return true;
+    }
+    if (msg?.type === 'plexus:reset-game') {
+      post('reset-game');
+      sendResponse({ ok: true });
+      return true;
+    }
+    if (msg?.type === 'plexus:get-game-stats') {
+      const handler = (event) => {
+        if (event.data?.__plexus === 'game-stats-reply') {
+          window.removeEventListener('message', handler);
+          sendResponse({ stats: event.data.stats });
+        }
+      };
+      window.addEventListener('message', handler);
+      post('get-game-stats');
+      setTimeout(() => {
+        window.removeEventListener('message', handler);
+        sendResponse({ stats: { score: 0, combo: 1, hits: 0 } });
+      }, 150);
+      return true;
+    }
     if (msg?.type === 'plexus:state') {
       sendResponse(state);
       return true;

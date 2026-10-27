@@ -5,6 +5,8 @@
 
   let settings = S ? S.sanitize({}) : {};
   let saveTimer = null;
+  let statsTimer = null;
+  let lastState = null;
 
   async function activeTabId() {
     try {
@@ -30,7 +32,7 @@
       const id = await activeTabId();
       if (id === undefined) return null;
       return await chrome.tabs.sendMessage(id, { type });
-    } catch (error) {
+    } catch (_) {
       return null;
     }
   }
@@ -60,6 +62,29 @@
     ...settings,
     elements: { ...settings.elements, [key]: { ...settings.elements[key], ...patch } },
   });
+
+  // Setup navigation tabs
+  function initTabs() {
+    const tabs = document.querySelectorAll('.popup-tab');
+    let activeTabName = 'powers';
+    try {
+      activeTabName = sessionStorage.getItem('plexus_popup_tab') || 'powers';
+    } catch (_) {}
+
+    function selectTab(tabName) {
+      tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === tabName));
+      document.querySelectorAll('.tab-pane').forEach((p) => {
+        p.classList.toggle('active', p.id === `pane-${tabName}`);
+      });
+      try { sessionStorage.setItem('plexus_popup_tab', tabName); } catch (_) {}
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => selectTab(tab.dataset.tab));
+    });
+
+    selectTab(activeTabName);
+  }
 
   function buildPresets() {
     const wrap = $('presets');
@@ -127,7 +152,7 @@
   }
 
   const renderers = [
-    // Footage
+    // Footage & Lighting
     bindSlider('darken', () => settings.darken, (v) => ({ ...settings, darken: v })),
     bindCheck('spillOn', () => settings.lightSpill?.on,
       (on) => ({ ...settings, lightSpill: { ...settings.lightSpill, on } })),
@@ -188,6 +213,19 @@
         enabled: energyBall ? true : settings.enabled,
         gestures: { ...settings.gestures, on: energyBall ? true : settings.gestures?.on, energyBall },
       })),
+    bindCheck('gestureParty', () => settings.gestures?.party,
+      (party) => ({
+        ...settings,
+        enabled: party ? true : settings.enabled,
+        gestures: {
+          ...settings.gestures,
+          on: party ? true : settings.gestures?.on,
+          party,
+          peace: party,
+          thumbsUp: party,
+          heart: party,
+        },
+      })),
     bindCheck('gesturePeace', () => settings.gestures?.peace,
       (peace) => ({
         ...settings,
@@ -222,7 +260,7 @@
         },
       })),
 
-    // Interactive Target Game
+    // Interactive Target Shooting Game
     bindCheck('targetGameOn', () => settings.targetGame?.on,
       (on) => ({
         ...settings,
@@ -232,7 +270,7 @@
     bindCheck('targetGameFocus', () => settings.targetGame?.focusMode !== false,
       (focusMode) => ({ ...settings, targetGame: { ...settings.targetGame, focusMode } })),
 
-    // Air Drawing
+    // Air Drawing (Air Canvas)
     bindCheck('airDrawOn', () => settings.airDraw?.on,
       (on) => ({
         ...settings,
@@ -244,7 +282,9 @@
       if (col) {
         col.addEventListener('input', () => save({ ...settings, airDraw: { ...settings.airDraw, color: col.value } }, false));
       }
-      return () => { if (col) col.value = settings.airDraw?.color || '#00ffff'; };
+      return () => {
+        if (col) col.value = settings.airDraw?.color || '#00ffff';
+      };
     })(),
     (() => {
       const sz = $('airDrawSize');
@@ -260,7 +300,7 @@
       };
     })(),
 
-    // Audio & Eco
+    // Performance & Audio
     bindCheck('audioPulseOn', () => settings.audioPulse?.on,
       (on) => ({ ...settings, audioPulse: { ...settings.audioPulse, on } })),
     bindSlider('audioPulseStrength', () => settings.audioPulse?.strength || 60,
@@ -270,6 +310,8 @@
 
   function render() {
     if (!S || !settings.elements) return;
+
+    // Render mesh element toggles and color pickers
     S.ELEMENTS.forEach((key) => {
       const el = settings.elements[key];
       const check = $(`${key}On`);
@@ -281,6 +323,7 @@
         if (row) row.classList.toggle('disabled', !el.on);
       }
     });
+
     renderers.forEach((fn) => fn());
 
     // Highlight active preset chip if matching
@@ -293,15 +336,14 @@
       chip.classList.toggle('active', isRainbow || isColorMatch);
     });
 
-    // Disable child gesture rows when master switch is OFF
+    // Update FX Cards visual states (.active and dimming)
     const gActive = !!settings.gestures?.on;
-    [
-      'gestureChidori', 'gestureSpiderWeb', 'gestureSuperSaiyan', 'gestureLaserSword',
-      'gestureFingerGun', 'gestureShield', 'gestureBall', 'gesturePeace',
-      'gestureThumbsUp', 'gestureHeart',
-    ].forEach((id) => {
-      const row = $(id)?.closest('.row');
-      if (row) row.classList.toggle('disabled', !gActive);
+    document.querySelectorAll('.fx-card').forEach((card) => {
+      const input = card.querySelector('input[type="checkbox"]');
+      if (input) {
+        card.classList.toggle('active', input.checked && gActive);
+      }
+      card.classList.toggle('disabled', !gActive);
     });
 
     // Disable target game child rows when game switch is OFF
@@ -309,10 +351,24 @@
     const focusRow = $('targetGameFocus')?.closest('.row');
     if (focusRow) focusRow.classList.toggle('disabled', !gameActive);
 
-    // Disable air draw child rows when master switch is OFF
+    // Update Game Speed button text
+    const speedBtn = $('gameSpeedBtn');
+    if (speedBtn) {
+      const isFast = settings.targetGame?.speed === 'fast';
+      speedBtn.textContent = isFast ? '⚡ Speed: Turbo' : '⚡ Speed: Normal';
+    }
+
+    // Disable air draw child controls when switch is OFF
     const airActive = !!settings.airDraw?.on;
     $('airDrawColor')?.closest('.row')?.classList.toggle('disabled', !airActive);
     $('airDrawSize')?.closest('.row')?.classList.toggle('disabled', !airActive);
+
+    // Sync active color swatch in Air Canvas
+    const curColor = (settings.airDraw?.color || '#00ffff').toLowerCase();
+    document.querySelectorAll('.swatch').forEach((swatch) => {
+      const c = swatch.dataset.color?.toLowerCase();
+      swatch.classList.toggle('active', c === curColor);
+    });
 
     // Disable audio strength slider when audio pulse is OFF
     const audioActive = !!settings.audioPulse?.on;
@@ -322,9 +378,19 @@
     if (spillRow) spillRow.classList.toggle('disabled', !settings.lightSpill?.on);
     const personRow = $('person')?.closest('.row');
     if (personRow) personRow.classList.toggle('disabled', !settings.personLight?.on);
-  }
 
-  let lastState = null;
+    // Footer diagnostic text
+    const diag = $('footerDiag');
+    if (diag) {
+      if (settings.ecoMode) {
+        diag.textContent = '🌱 Eco Mode Active · Low CPU/GPU (Zero Lag)';
+      } else if (settings.enabled !== false) {
+        diag.textContent = '🟢 Camera Plexus Ready · Full 60 FPS Control';
+      } else {
+        diag.textContent = '⚪ Effects Paused · Click Turn On to Start';
+      }
+    }
+  }
 
   function showState(state) {
     if (state) lastState = state;
@@ -356,6 +422,7 @@
     }
   }
 
+  // Master Power button
   const toggleBtn = $('toggle');
   if (toggleBtn) {
     toggleBtn.addEventListener('click', async () => {
@@ -370,6 +437,51 @@
     });
   }
 
+  // Target Game Speed button
+  const speedBtn = $('gameSpeedBtn');
+  if (speedBtn) {
+    speedBtn.addEventListener('click', () => {
+      const cur = settings.targetGame?.speed || 'normal';
+      const next = cur === 'fast' ? 'normal' : 'fast';
+      save({ ...settings, targetGame: { ...settings.targetGame, speed: next } }, false);
+    });
+  }
+
+  // Target Game Reset button
+  const gameResetBtn = $('gameResetBtn');
+  if (gameResetBtn) {
+    gameResetBtn.addEventListener('click', () => {
+      broadcast({ type: 'plexus:reset-game' });
+      if ($('gameScoreVal')) $('gameScoreVal').textContent = '0';
+      if ($('gameComboVal')) $('gameComboVal').textContent = '1x';
+      if ($('gameHitsVal')) $('gameHitsVal').textContent = '0';
+      const orig = gameResetBtn.textContent;
+      gameResetBtn.textContent = '✅ Reset!';
+      setTimeout(() => { gameResetBtn.textContent = orig; }, 1000);
+    });
+  }
+
+  // Air Canvas color swatches
+  document.querySelectorAll('.swatch').forEach((swatch) => {
+    swatch.addEventListener('click', () => {
+      const color = swatch.dataset.color;
+      if (!color) return;
+      save({ ...settings, airDraw: { ...settings.airDraw, color } }, false);
+    });
+  });
+
+  // Air Canvas Clear button
+  const airDrawClearBtn = $('airDrawClearBtn');
+  if (airDrawClearBtn) {
+    airDrawClearBtn.addEventListener('click', () => {
+      broadcast({ type: 'plexus:clear-drawings' });
+      const orig = airDrawClearBtn.textContent;
+      airDrawClearBtn.textContent = '✨ Canvas Cleared!';
+      setTimeout(() => { airDrawClearBtn.textContent = orig; }, 1000);
+    });
+  }
+
+  // Reset All Settings button
   const resetBtn = $('reset');
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
@@ -379,11 +491,27 @@
         save(next, false);
         showState(lastState);
         broadcast({ type: 'plexus:set-active', active: true });
+        const orig = resetBtn.textContent;
+        resetBtn.textContent = '✅ Reset Done!';
+        setTimeout(() => { resetBtn.textContent = orig; }, 1200);
       }
     });
   }
 
+  // Periodically query live game stats while popup is open
+  async function pollGameStats() {
+    try {
+      const res = await ask('plexus:get-game-stats');
+      if (res && res.stats) {
+        if ($('gameScoreVal')) $('gameScoreVal').textContent = String(res.stats.score || 0);
+        if ($('gameComboVal')) $('gameComboVal').textContent = `${res.stats.combo || 1}x`;
+        if ($('gameHitsVal')) $('gameHitsVal').textContent = String(res.stats.hits || 0);
+      }
+    } catch (_) {}
+  }
+
   async function init() {
+    initTabs();
     buildPresets();
     buildElements();
 
@@ -407,6 +535,7 @@
       try { chrome.storage.sync.set({ settings }).catch(() => {}); } catch (_) {}
       try { chrome.storage.local.set({ settings }).catch(() => {}); } catch (_) {}
     }
+
     render();
     showState({ active: settings.enabled !== false, engine: false });
 
@@ -421,7 +550,15 @@
     } catch (_) {
       showState({ active: settings.enabled !== false, engine: false });
     }
+
+    // Start live scoreboard polling
+    pollGameStats();
+    statsTimer = setInterval(pollGameStats, 600);
   }
+
+  window.addEventListener('unload', () => {
+    if (statsTimer) clearInterval(statsTimer);
+  });
 
   init();
 })();

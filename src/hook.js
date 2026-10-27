@@ -163,6 +163,18 @@
     if (msg.__plexus === 'set-active') {
       setMasterActive(Boolean(msg.active));
     }
+    if (msg.__plexus === 'clear-drawings') {
+      FX.engine?.clearDrawings?.();
+      FX.showStatus?.('Air canvas cleared', 'info');
+    }
+    if (msg.__plexus === 'reset-game') {
+      FX.engine?.resetGame?.();
+      FX.showStatus?.('Game score reset', 'ok');
+    }
+    if (msg.__plexus === 'get-game-stats') {
+      const stats = FX.engine?.getGameStats?.() || { score: 0, combo: 1, hits: 0 };
+      post('game-stats-reply', { stats });
+    }
     if (msg.__plexus === 'toggle') toggleOrExplain();
   });
   post('hello');

@@ -53,7 +53,7 @@
       speed: 'normal',
     },
     ecoMode: false,
-    hudVisible: true,
+    hudVisible: false,
   });
 
   const PRESETS = {

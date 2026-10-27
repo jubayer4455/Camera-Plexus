@@ -355,6 +355,17 @@
   }
 
   function createHUD() {
+    // Clean up any previously attached floating HUD element
+    const existing = document.getElementById('plexus-floating-hud');
+    if (existing) existing.remove();
+
+    // The in-page floating HUD is completely disabled by default per user request
+    // ("pop up ta off kore dew, full control uporer oi khan thake hobe").
+    // All controls are managed exclusively via the Chrome extension toolbar popup.
+    const S = getSettingsModule();
+    const cfg = FX.settings || (S ? S.DEFAULTS : {});
+    if (cfg.hudVisible !== true) return;
+
     if (container || window.self !== window.top) return;
     if (!document.body) {
       if (document.readyState === 'loading') {
@@ -907,9 +918,15 @@
   }
 
   function updateHUD() {
-    if (!container) return;
+    const existing = document.getElementById('plexus-floating-hud');
     const S = getSettingsModule();
     const cfg = FX.settings || (S ? S.DEFAULTS : {});
+    if (cfg.hudVisible !== true && existing) {
+      existing.remove();
+      container = null;
+      return;
+    }
+    if (!container) return;
     const active = FX.engine ? FX.engine.isActive() : (cfg.enabled !== false);
 
     // Header badge
